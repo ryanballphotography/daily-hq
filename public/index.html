@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily HQ</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="shell">
+    <div class="sidebar">
+      <div class="logo">
+        Daily HQ
+        <span>Ryan Ball Photography</span>
+      </div>
+      <div class="ns">Focus</div>
+      <div class="ni active" data-view="today"><i class="ti ti-layout-dashboard"></i> Today</div>
+      <div class="ni" data-view="chat"><i class="ti ti-message-circle"></i> PA Chat</div>
+      <div class="ns">Tasks</div>
+      <div class="ni" data-view="all"><i class="ti ti-list-check"></i> All Tasks <span class="nb" id="task-badge"></span></div>
+      <div class="ni" data-view="completed"><i class="ti ti-circle-check"></i> Completed</div>
+      <div class="ns">Apps</div>
+      <div class="ni ext" data-url="https://shoot-planner.ryanballphotography.com"><i class="ti ti-camera"></i> Shoot Planner</div>
+      <div class="ni ext" data-url="https://the-darkroom-production.up.railway.app"><i class="ti ti-moon"></i> The Darkroom</div>
+      <div class="ni ext" data-url="https://app.freeagent.com"><i class="ti ti-receipt"></i> FreeAgent</div>
+      <div class="ni ext" data-url="https://calendar.google.com"><i class="ti ti-calendar"></i> Calendar</div>
+    </div>
+
+    <div class="main">
+      <div class="topbar">
+        <span class="topbar-title" id="topbar-title">Today</span>
+        <span class="topbar-date" id="topbar-date"></span>
+        <button class="btn-add" id="btn-add-task"><i class="ti ti-plus"></i> Add task</button>
+      </div>
+
+      <!-- Today view -->
+      <div class="view" id="view-today">
+        <div class="pa-note" id="pa-note">
+          <div class="pa-note-label"><i class="ti ti-brain"></i> PA</div>
+          <div class="pa-note-text" id="pa-note-text">Loading your briefing...</div>
+        </div>
+        <div id="today-tasks"></div>
+      </div>
+
+      <!-- All tasks view -->
+      <div class="view hidden" id="view-all">
+        <div id="all-tasks"></div>
+      </div>
+
+      <!-- Completed view -->
+      <div class="view hidden" id="view-completed">
+        <div id="completed-tasks"></div>
+      </div>
+
+      <!-- Chat view -->
+      <div class="view hidden" id="view-chat">
+        <div class="chat-wrap">
+          <div class="chat-msgs" id="chat-msgs">
+            <div class="msg msg-pa">
+              <div class="msg-label">PA</div>
+              <div class="msg-bubble">Hi Ryan. What's on your mind?</div>
+            </div>
+          </div>
+          <div class="chat-input-row">
+            <input type="text" id="chat-input" placeholder="Ask your PA anything..." />
+            <button class="send-btn" id="chat-send"><i class="ti ti-send"></i></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add task modal -->
+  <div class="modal-bg hidden" id="modal">
+    <div class="modal">
+      <div class="modal-title">New task</div>
+      <div class="modal-field">
+        <label>Task</label>
+        <input type="text" id="m-title" placeholder="What needs doing?" />
+      </div>
+      <div class="modal-field">
+        <label>Notes</label>
+        <textarea id="m-notes" placeholder="Any extra detail..."></textarea>
+      </div>
+      <div class="modal-row">
+        <div class="modal-field">
+          <label>Due date</label>
+          <input type="date" id="m-due" />
+        </div>
+        <div class="modal-field">
+          <label>Priority</label>
+          <select id="m-priority">
+            <option value="p3">P3 — low</option>
+            <option value="p2">P2 — medium</option>
+            <option value="p1">P1 — high</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-row">
+        <div class="modal-field">
+          <label>Category</label>
+          <select id="m-category">
+            <option value="work">Work</option>
+            <option value="exercise">Exercise</option>
+            <option value="home">Home</option>
+            <option value="personal">Personal</option>
+          </select>
+        </div>
+        <div class="modal-field">
+          <label>Recurring</label>
+          <select id="m-recurring">
+            <option value="">None</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-field">
+        <label>Tag</label>
+        <input type="text" id="m-tag" placeholder="e.g. Lidl, Nando's, Admin" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" id="modal-cancel">Cancel</button>
+        <button class="btn-save" id="modal-save">Save task</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

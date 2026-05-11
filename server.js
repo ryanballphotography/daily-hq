@@ -111,5 +111,12 @@ app.patch('/api/tasks/:id/complete', async (req, res) => {
   }
 });
 
+app.get("/api/tasks/completed", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM tasks WHERE done = true ORDER BY completed_at DESC LIMIT 50");
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 const PORT = process.env.PORT || 3000;
 initDB().then(() => app.listen(PORT, () => console.log(`Daily HQ running on ${PORT}`)));
