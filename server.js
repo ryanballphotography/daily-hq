@@ -1,4 +1,5 @@
 require('dotenv').config();
+const fetch = require('node-fetch');
 const express = require('express');
 const { Pool } = require('pg');
 const path = require('path');
@@ -115,6 +116,30 @@ app.get("/api/tasks/completed", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM tasks WHERE done = true ORDER BY completed_at DESC LIMIT 50");
     res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/pa/briefing", async (req, res) => {
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify(req.body)
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/pa/chat", async (req, res) => {
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify(req.body)
+    });
+    const data = await response.json();
+    res.json(data);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

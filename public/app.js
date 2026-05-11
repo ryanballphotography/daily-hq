@@ -2,7 +2,6 @@ const today = new Date().toISOString().split('T')[0];
 let tasks = [];
 let chatHistory = [];
 
-// --- Init ---
 document.addEventListener('DOMContentLoaded', () => {
   setDate();
   loadTasks();
@@ -16,7 +15,6 @@ function setDate() {
   document.getElementById('topbar-date').textContent = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
-// --- Nav ---
 function bindNav() {
   document.querySelectorAll('.ni[data-view]').forEach(el => {
     el.addEventListener('click', () => {
@@ -37,7 +35,6 @@ function bindNav() {
   document.getElementById('btn-add-task').addEventListener('click', openModal);
 }
 
-// --- Tasks API ---
 async function loadTasks() {
   const res = await fetch('/api/tasks');
   tasks = await res.json();
@@ -52,11 +49,10 @@ async function createTask(data) {
   tasks.unshift(task);
   updateBadge();
   renderToday();
-  renderAll();
 }
 
 async function completeTask(id) {
-  await fetch(`/api/tasks/${id}/complete`, { method: 'PATCH' });
+  await fetch('/api/tasks/' + id + '/complete', { method: 'PATCH' });
   tasks = tasks.filter(t => t.id !== id);
   updateBadge();
   renderToday();
@@ -64,16 +60,11 @@ async function completeTask(id) {
 }
 
 async function deleteTask(id) {
-  await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+  await fetch('/api/tasks/' + id, { method: 'DELETE' });
   tasks = tasks.filter(t => t.id !== id);
   updateBadge();
   renderToday();
   renderAll();
-}
-
-async function loadCompleted() {
-  const res = await fetch('/api/tasks/completed');
-  return res.json();
 }
 
 function updateBadge() {
@@ -82,7 +73,6 @@ function updateBadge() {
   badge.style.display = tasks.length ? 'inline' : 'none';
 }
 
-// --- Render ---
 function isOverdue(due) { return due && due.split('T')[0] < today; }
 function isDueToday(due) { return due && due.split('T')[0] === today; }
 
@@ -96,18 +86,17 @@ function formatDate(due) {
 
 function taskHTML(t) {
   const od = isOverdue(t.due_date);
-  const pclass = t.priority || '';
   const cat = t.category || 'work';
   return `
     <div class="task" id="task-${t.id}">
-      <div class="check ${pclass}" onclick="completeTask(${t.id})"></div>
+      <div class="check ${t.priority || ''}" onclick="completeTask(${t.id})"></div>
       <div class="task-body">
         <div class="task-title">${t.title}</div>
         <div class="task-meta">
           <span class="tag tag-${cat}">${cat}</span>
-          ${t.tag ? `<span class="tag">${t.tag}</span>` : ''}
-          ${t.due_date ? `<span class="task-date ${od ? 'overdue' : ''}">${od ? '⚠ ' : ''}${formatDate(t.due_date)}</span>` : ''}
-          ${t.recurring ? `<span class="tag"><i class="ti ti-refresh"></i> ${t.recurring}</span>` : ''}
+          ${t.tag ? '<span class="tag">' + t.tag + '</span>' : ''}
+          ${t.due_date ? '<span class="task-date ' + (od ? 'overdue' : '') + '">' + (od ? '⚠ ' : '') + formatDate(t.due_date) + '</span>' : ''}
+          ${t.recurring ? '<span class="tag">↻ ' + t.recurring + '</span>' : ''}
         </div>
       </div>
       <i class="ti ti-trash task-del" onclick="deleteTask(${t.id})"></i>
@@ -120,28 +109,27 @@ function renderToday() {
   const dueToday = tasks.filter(t => isDueToday(t.due_date));
   const p1 = tasks.filter(t => !isOverdue(t.due_date) && !isDueToday(t.due_date) && t.priority === 'p1');
   const rest = tasks.filter(t => !isOverdue(t.due_date) && !isDueToday(t.due_date) && t.priority !== 'p1').slice(0, 5);
-
   let html = '';
-  if (overdue.length) html += `<div class="section-lbl">Overdue</div>` + overdue.map(taskHTML).join('');
-  if (dueToday.length) html += `<div class="section-lbl">Due today</div>` + dueToday.map(taskHTML).join('');
-  if (p1.length) html += `<div class="section-lbl">High priority</div>` + p1.map(taskHTML).join('');
-  if (rest.length) html += `<div class="section-lbl">Up next</div>` + rest.map(taskHTML).join('');
-  if (!html) html = `<div class="empty">Nothing on your plate. Add a task or enjoy the quiet.</div>`;
+  if (overdue.length) html += '<div class="section-lbl">Overdue</div>' + overdue.map(taskHTML).join('');
+  if (dueToday.length) html += '<div class="section-lbl">Due today</div>' + dueToday.map(taskHTML).join('');
+  if (p1.length) html += '<div class="section-lbl">High priority</div>' + p1.map(taskHTML).join('');
+  if (rest.length) html += '<div class="section-lbl">Up next</div>' + rest.map(taskHTML).join('');
+  if (!html) html = '<div class="empty">Nothing on your plate. Add a task or enjoy the quiet.</div>';
   el.innerHTML = html;
 }
 
 function renderAll() {
   const el = document.getElementById('all-tasks');
-  if (!tasks.length) { el.innerHTML = `<div class="empty">No open tasks.</div>`; return; }
+  if (!tasks.length) { el.innerHTML = '<div class="empty">No open tasks.</div>'; return; }
   el.innerHTML = tasks.map(taskHTML).join('');
 }
 
 async function renderCompleted() {
   const el = document.getElementById('completed-tasks');
-  el.innerHTML = `<div class="empty">Loading...</div>`;
+  el.innerHTML = '<div class="empty">Loading...</div>';
   const res = await fetch('/api/tasks/completed');
   const done = await res.json();
-  if (!done.length) { el.innerHTML = `<div class="empty">Nothing completed yet.</div>`; return; }
+  if (!done.length) { el.innerHTML = '<div class="empty">Nothing completed yet.</div>'; return; }
   el.innerHTML = done.map(t => `
     <div class="task done">
       <div class="check checked"><i class="ti ti-check"></i></div>
@@ -152,7 +140,6 @@ async function renderCompleted() {
     </div>`).join('');
 }
 
-// --- Modal ---
 function bindModal() {
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
@@ -189,49 +176,31 @@ async function saveModal() {
   closeModal();
 }
 
-// --- PA Briefing ---
 async function generateBriefing() {
   const el = document.getElementById('pa-note-text');
   const overdue = tasks.filter(t => isOverdue(t.due_date)).length;
   const dueToday = tasks.filter(t => isDueToday(t.due_date)).length;
-  const p1tasks = tasks.filter(t => t.priority === 'p1').map(t => t.title);
-  const context = `
-    Today is ${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}.
-    Ryan has ${tasks.length} open tasks.
-    ${overdue > 0 ? `${overdue} tasks are overdue.` : 'No overdue tasks.'}
-    ${dueToday > 0 ? `${dueToday} tasks are due today.` : ''}
-    ${p1tasks.length > 0 ? `High priority tasks: ${p1tasks.join(', ')}.` : ''}
-    Open tasks: ${tasks.slice(0, 10).map(t => `"${t.title}" (${t.category}, ${t.priority}${t.due_date ? ', due ' + formatDate(t.due_date) : ''})`).join('; ')}.
-  `;
+  const taskList = tasks.slice(0, 10).map(t => '"' + t.title + '" (' + t.category + ', ' + t.priority + (t.due_date ? ', due ' + formatDate(t.due_date) : '') + ')').join('; ');
+  const context = 'Today is ' + new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + '. Ryan has ' + tasks.length + ' open tasks. ' + (overdue > 0 ? overdue + ' are overdue. ' : '') + (dueToday > 0 ? dueToday + ' due today. ' : '') + 'Tasks: ' + taskList;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/pa/briefing', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
-        system: `You are Ryan's personal PA. Ryan is a commercial food and drink photographer based in London and Somerset. He runs his own limited company.
-
-Your job: give a short, direct morning briefing — 2-4 sentences max. Tell him what to focus on first and why. Be direct and blunt, no softening. Connect tasks to real consequences. If nothing is urgent, tell him to enjoy the day.
-
-Rules:
-- Money tasks (invoices, estimates) always come first
-- Call out anything overdue directly
-- If his plate is clear, give him permission to do something enjoyable
-- Never list everything — pick the 1-2 things that matter most
-- Speak like a trusted, straight-talking PA who knows his business`,
-        messages: [{ role: 'user', content: `Here is Ryan's current task context:\n${context}\n\nGive him his morning briefing.` }]
+        system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer based in London and Somerset running his own limited company with clients including Lidl, Nando\'s, Ocado, and Ardbeg. Give a short direct morning briefing — 2-4 sentences max. Be blunt, no softening. Tell him what to do first and why. Connect tasks to real consequences. If his plate is clear, tell him to enjoy the day. Money tasks always come first. Never list everything — pick the 1-2 things that matter most.',
+        messages: [{ role: 'user', content: 'Here is my task context:\n' + context + '\n\nGive me my morning briefing.' }]
       })
     });
     const data = await res.json();
     el.textContent = data.content[0].text;
   } catch (err) {
-    el.textContent = `${tasks.length} tasks open. ${overdue > 0 ? `${overdue} overdue — start there.` : dueToday > 0 ? `${dueToday} due today.` : 'Nothing urgent — good day to get ahead.'}`;
+    el.textContent = tasks.length + ' tasks open. ' + (overdue > 0 ? overdue + ' overdue — start there.' : 'Nothing urgent.');
   }
 }
 
-// --- Chat ---
 function bindChat() {
   document.getElementById('chat-send').addEventListener('click', sendChat);
   document.getElementById('chat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
@@ -242,34 +211,19 @@ async function sendChat() {
   const msg = input.value.trim();
   if (!msg) return;
   input.value = '';
-
   appendMsg('me', msg);
   chatHistory.push({ role: 'user', content: msg });
-
   const loading = appendMsg('pa', 'Thinking...', true);
-
-  const taskContext = tasks.slice(0, 15).map(t => `- ${t.title} (${t.category}, ${t.priority}${t.due_date ? ', due ' + formatDate(t.due_date) : ''})`).join('\n');
+  const taskContext = tasks.slice(0, 15).map(t => '- ' + t.title + ' (' + t.category + ', ' + t.priority + (t.due_date ? ', due ' + formatDate(t.due_date) : '') + ')').join('\n');
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('/api/pa/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
-        system: `You are Ryan's personal PA. Ryan is a commercial food and drink photographer based in London and Somerset running his own limited company with major clients including Lidl, Nando's, Ocado, and Ardbeg Whisky.
-
-Personality: direct and blunt, no softening, no hedging. Short sentences. Give one clear answer, not a list of options. Connect advice to real consequences. If his work is clear, give him genuine permission to rest or do something enjoyable without guilt.
-
-His current open tasks:
-${taskContext}
-
-Key rules:
-- Money (invoices, estimates) always comes first
-- He avoids following up with clients and sending estimates — call this out directly
-- He tends to do admin late at night which hurts his sleep — push him to do it earlier
-- Creative work, gardening, personal projects are legitimate productivity
-- When he asks if he can do something enjoyable, check his tasks and give a straight yes or no with one reason`,
+        system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nando\'s, Ocado, Ardbeg. Be direct and blunt — no softening, no hedging. Short sentences. One clear answer, not options. Connect advice to real consequences. Money and client emails always come first. He avoids sending estimates and following up with clients — call this out. He does admin late at night which hurts his sleep — push him to do it earlier. Creative work and gardening are legitimate productivity. When he asks if he can do something enjoyable, check his tasks and give a straight yes or no with one reason.\n\nHis open tasks:\n' + taskContext,
         messages: chatHistory
       })
     });
@@ -287,8 +241,8 @@ Key rules:
 function appendMsg(who, text, isLoading = false) {
   const msgs = document.getElementById('chat-msgs');
   const div = document.createElement('div');
-  div.className = `msg msg-${who}`;
-  div.innerHTML = `<div class="msg-label">${who === 'pa' ? 'PA' : 'Ryan'}</div><div class="msg-bubble${isLoading ? ' loading' : ''}">${text}</div>`;
+  div.className = 'msg msg-' + who;
+  div.innerHTML = '<div class="msg-label">' + (who === 'pa' ? 'PA' : 'Ryan') + '</div><div class="msg-bubble' + (isLoading ? ' loading' : '') + '">' + text + '</div>';
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
   return div.querySelector('.msg-bubble');
