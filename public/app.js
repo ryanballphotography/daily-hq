@@ -142,7 +142,7 @@ async function renderCompleted() {
 
 function bindModal() {
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
-  document.getElementById('modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+  document.getElementById("modal-bg").addEventListener('click', e => { if (e.target.classList.contains("modal-bg")) closeModal(); });
   document.getElementById('modal-save').addEventListener('click', saveModal);
   document.getElementById('m-title').addEventListener('keydown', e => { if (e.key === 'Enter') saveModal(); });
 }
@@ -155,11 +155,11 @@ function openModal() {
   document.getElementById('m-category').value = 'work';
   document.getElementById('m-recurring').value = '';
   document.getElementById('m-tag').value = '';
-  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById("modal-bg").classList.remove('hidden');
   setTimeout(() => document.getElementById('m-title').focus(), 50);
 }
 
-function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+function closeModal() { document.getElementById("modal-bg").classList.add('hidden'); }
 
 async function saveModal() {
   const title = document.getElementById('m-title').value.trim();
