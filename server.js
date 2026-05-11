@@ -143,5 +143,15 @@ app.post("/api/pa/chat", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get("/api/shoot-planner", async (req, res) => {
+  try {
+    const response = await fetch("https://shoot-planner.ryanballphotography.com/api/daily-hq-summary", {
+      headers: { "x-api-key": process.env.DAILY_HQ_SECRET }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
 const PORT = process.env.PORT || 3000;
 initDB().then(() => app.listen(PORT, () => console.log(`Daily HQ running on ${PORT}`)));

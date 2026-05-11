@@ -5,6 +5,7 @@ let chatHistory = [];
 document.addEventListener('DOMContentLoaded', () => {
   setDate();
   loadTasks();
+  loadShootPlanner();
   bindNav();
   bindModal();
   bindChat();
@@ -246,4 +247,62 @@ function appendMsg(who, text, isLoading = false) {
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
   return div.querySelector('.msg-bubble');
+}
+
+async function loadShootPlanner() {
+  try {
+    const res = await fetch('/api/shoot-planner');
+    const data = await res.json();
+    renderShootPlannerPanel(data);
+    return data;
+  } catch(e) {
+    console.log('Shoot Planner unavailable', e);
+    return null;
+  }
+}
+
+function renderShootPlannerPanel(data) {
+  const el = document.getElementById('sp-panel');
+  if (!el) return;
+  let html = '';
+
+  if (data.shoots && data.shoots.length) {
+    html += '<div class="section-lbl">Upcoming shoots</div>';
+    html += data.shoots.map(s => {
+      const daysUntil = Math.ceil((new Date(s.startDate) - new Date()) / 86400000);
+      const urgent = daysUntil <= 2;
+      return `<div class="task">
+        <div class="check ${urgent ? 'p1' : 'p2'}"></div>
+        <div class="task-body">
+          <div class="task-title">${s.name}</div>
+          <div class="task-meta">
+            <span class="tag tag-work">shoot</span>
+            <span class="tag">${s.startDate}</span>
+            <span class="task-date ${urgent ? 'overdue' : ''}">${daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : 'In ' + daysUntil + ' days'}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  if (data.quotes && data.quotes.length) {
+    html += '<div class="section-lbl">Pending quotes</div>';
+    html += data.quotes.map(q => {
+      const daysOld = Math.floor((new Date() - new Date(q.createdAt)) / 86400000);
+      const stale = daysOld >= 2;
+      return `<div class="task">
+        <div class="check ${stale ? 'p1' : 'p3'}"></div>
+        <div class="task-body">
+          <div class="task-title">${q.name} — ${q.clientName}</div>
+          <div class="task-meta">
+            <span class="tag tag-work">quote</span>
+            <span class="task-date ${stale ? 'overdue' : ''}">${stale ? '⚠ ' : ''}${daysOld === 0 ? 'Created today' : daysOld + ' days old'}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  if (!html) html = '<div class="empty" style="padding:0.5rem 0;font-size:12px;">No upcoming shoots or pending quotes.</div>';
+  el.innerHTML = html;
 }
