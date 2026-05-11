@@ -98,7 +98,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .send-btn { width: 38px; height: 38px; border-radius: var(--radius); background: var(--text); border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 .send-btn:hover { opacity: 0.85; }
 
-.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.4); align-items: center; justify-content: center; z-index: 100; }
+.modal-bg:not(.hidden) { display: flex; }
 .modal { background: var(--bg); border-radius: var(--radius-lg); border: 0.5px solid var(--border2); padding: 1.5rem; width: 420px; max-width: 95vw; }
 .modal-title { font-size: 15px; font-weight: 500; margin-bottom: 1.25rem; }
 .modal-field { margin-bottom: 0.875rem; }
