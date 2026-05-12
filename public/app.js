@@ -300,6 +300,19 @@ async function sendChat() {
   chatHistory.push({ role: 'user', content: msg });
   const loading = appendMsg('pa', 'Thinking...', true);
   const taskContext = tasks.slice(0, 15).map(t => '- ' + t.title + ' (' + t.category + ', ' + t.priority + (t.due_date ? ', due ' + formatDate(t.due_date) : '') + ')').join('\n');
+  let calendarContext = 'Not loaded';
+  try {
+    const calRes = await fetch('/api/calendar');
+    const calData = await calRes.json();
+    if (calData.events && calData.events.length) {
+      calendarContext = calData.events.map(e => {
+        const d = new Date(e.start.split('T')[0] + 'T00:00:00');
+        const label = d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'});
+        const time = e.allDay ? 'all day' : new Date(e.start).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+        return '- ' + label + ': ' + e.title + ' (' + time + ')';
+      }).join('\n');
+    }
+  } catch(e) { calendarContext = 'Unavailable'; }
 
   try {
     const res = await fetch('/api/pa/chat', {
@@ -308,7 +321,7 @@ async function sendChat() {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
-        system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nando\'s, Ocado, Ardbeg. Be direct and blunt — no softening, no hedging. Short sentences. One clear answer, not options. Connect advice to real consequences. Money and client emails always come first. He avoids sending estimates and following up with clients — call this out. He does admin late at night which hurts his sleep — push him to do it earlier. Creative work and gardening are legitimate productivity. When he asks if he can do something enjoyable, check his tasks and give a straight yes or no with one reason.\n\nHis open tasks:\n' + taskContext,
+        system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nando\'s, Ocado, Ardbeg. Be direct and blunt — no softening, no hedging. Short sentences. One clear answer, not options. Connect advice to real consequences. Money and client emails always come first. He avoids sending estimates and following up with clients — call this out. He does admin late at night which hurts his sleep — push him to do it earlier. Creative work and gardening are legitimate productivity. When he asks if he can do something enjoyable, check his tasks and give a straight yes or no with one reason.\n\nHis open tasks:\n' + taskContext + '\n\nCalendar events (next 14 days):\n' + calendarContext,
         messages: chatHistory
       })
     });
