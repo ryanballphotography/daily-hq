@@ -145,6 +145,17 @@ app.post("/api/pa/chat", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+
+app.get("/api/calendar", async (req, res) => {
+  try {
+    const response = await fetch("https://shoot-planner.ryanballphotography.com/api/calendar-events", {
+      headers: { "x-api-key": process.env.DAILY_HQ_SECRET }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
 app.get("/api/shoot-planner", async (req, res) => {
   try {
     const response = await fetch("https://shoot-planner.ryanballphotography.com/api/daily-hq-summary", {
