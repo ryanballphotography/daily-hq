@@ -155,3 +155,4 @@ app.get("/api/shoot-planner", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 initDB().then(() => app.listen(PORT, () => console.log(`Daily HQ running on ${PORT}`)));
+// temp debug

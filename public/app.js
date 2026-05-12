@@ -41,7 +41,6 @@ async function loadTasks() {
   tasks = await res.json();
   updateBadge();
   renderToday();
-  generateBriefing();
 }
 
 async function createTask(data) {
@@ -254,9 +253,11 @@ async function loadShootPlanner() {
     const res = await fetch('/api/shoot-planner');
     const data = await res.json();
     renderShootPlannerPanel(data);
+    generateBriefingWithContext(data);
     return data;
   } catch(e) {
     console.log('Shoot Planner unavailable', e);
+    generateBriefingWithContext(null);
     return null;
   }
 }
@@ -305,4 +306,43 @@ function renderShootPlannerPanel(data) {
 
   if (!html) html = '<div class="empty" style="padding:0.5rem 0;font-size:12px;">No upcoming shoots or pending quotes.</div>';
   el.innerHTML = html;
+}
+
+// Override generateBriefing to include shoot planner data
+async function generateBriefingWithContext(spData) {
+  const el = document.getElementById('pa-note-text');
+  const overdue = tasks.filter(t => isOverdue(t.due_date)).length;
+  const dueToday = tasks.filter(t => isDueToday(t.due_date)).length;
+  const taskList = tasks.slice(0, 10).map(t => '"' + t.title + '" (' + t.category + ', ' + t.priority + (t.due_date ? ', due ' + formatDate(t.due_date) : '') + ')').join('; ');
+
+  let shootContext = '';
+  if (spData && spData.shoots && spData.shoots.length) {
+    const todayShoots = spData.shoots.filter(s => s.startDate === today);
+    const soonShoots = spData.shoots.filter(s => s.startDate !== today);
+    if (todayShoots.length) shootContext += 'TODAY\'S SHOOTS: ' + todayShoots.map(s => s.name).join(', ') + '. ';
+    if (soonShoots.length) shootContext += 'UPCOMING SHOOTS: ' + soonShoots.map(s => s.name + ' on ' + s.startDate).join(', ') + '. ';
+  }
+  if (spData && spData.quotes && spData.quotes.length) {
+    const stale = spData.quotes.filter(q => Math.floor((new Date() - new Date(q.createdAt)) / 86400000) >= 2);
+    if (stale.length) shootContext += 'STALE QUOTES (unsent 2+ days): ' + stale.map(q => q.name + ' for ' + q.clientName).join(', ') + '. ';
+  }
+
+  const context = 'Today is ' + new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + '. ' + shootContext + 'Ryan has ' + tasks.length + ' open tasks. ' + (overdue > 0 ? overdue + ' are overdue. ' : '') + (dueToday > 0 ? dueToday + ' due today. ' : '') + 'Tasks: ' + taskList;
+
+  try {
+    const res = await fetch('/api/pa/briefing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer based in London and Somerset running his own limited company with clients including Lidl, Nando\'s, Ocado, and Ardbeg. Give a short direct morning briefing — 2-4 sentences max. Be blunt, no softening. Tell him what to do first and why. If he has a shoot today, lead with that. If quotes are stale, call it out. If his plate is clear, tell him to enjoy the day. Never list everything — pick the 1-2 things that matter most.',
+        messages: [{ role: 'user', content: 'Here is my context:\n' + context + '\n\nGive me my morning briefing.' }]
+      })
+    });
+    const data = await res.json();
+    el.textContent = data.content[0].text;
+  } catch (err) {
+    el.textContent = shootContext || (tasks.length + ' tasks open.');
+  }
 }
