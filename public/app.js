@@ -443,56 +443,14 @@ function loadIframe(url, label, navEl) {
 }
 
 
-async function showCalendarView() {
-  const el = document.getElementById('view-calendar');
-  el.innerHTML = '<div style="padding:1rem;color:var(--text3);font-size:13px;">Loading calendar...</div>';
-  
-  try {
-    const res = await fetch('/api/calendar');
-    const data = await res.json();
-    const events = data.events || [];
-    
-    // Build 14-day view
-    const days = [];
-    for (let i = 0; i < 14; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      days.push(d);
-    }
-    
-    let html = '<div style="padding:1rem;">';
-    
-    days.forEach(day => {
-      const dateStr = day.toISOString().split("T")[0];
-      const isToday = dateStr === new Date().toISOString().split("T")[0];
-      const dayEvents = events.filter(e => e.start.split("T")[0] === dateStr);
-      
-      if (!dayEvents.length && !isToday) return;
-      
-      const dayLabel = day.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
-      
-      html += "<div style=\"margin-bottom:1rem;\">";
-      html += "<div style=\"font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:" + (isToday ? "var(--text)" : "var(--text3)") + ";font-weight:" + (isToday ? "600" : "400") + ";margin-bottom:0.4rem;\">" + (isToday ? "Today — " : "") + dayLabel + "</div>";
-      
-      if (dayEvents.length) {
-        dayEvents.forEach(e => {
-          const time = e.allDay ? "All day" : new Date(e.start).toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit"});
-          html += "<div style=\"display:flex;gap:10px;align-items:flex-start;padding:7px 10px;background:var(--bg2);border-radius:8px;margin-bottom:4px;\">";
-          html += "<span style=\"font-size:11px;color:var(--text3);min-width:45px;margin-top:1px;\">" + time + "</span>";
-          html += "<span style=\"font-size:13px;color:var(--text);\">" + e.title + "</span>";
-          html += "</div>";
-        });
-      } else if (isToday) {
-        html += "<div style=\"font-size:13px;color:var(--text3);padding:7px 10px;\">Nothing scheduled</div>";
-      }
-      
-      html += "</div>";
-    });
-    
-    html += "</div>";
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = "<div style=\"padding:1rem;color:var(--text3);font-size:13px;\">Could not load calendar.</div>";
+function showCalendarView() {
+  var c = document.getElementById('view-calendar');
+  if (c && !c.querySelector('iframe')) {
+    var f = document.createElement('iframe');
+    f.src = 'https://calendar.google.com/calendar/embed?src=ryan%40ryanballphotography.com&src=c_a4281f75d282938d2163fbbe126730ede2babd78fcae29ee34d2556f6979cad9%40group.calendar.google.com&src=24b8634861e8a4fccb81c62ca9561c52956af0230a8c86ffe2c5f7775bd327ef%40group.calendar.google.com&src=0395cbfbffc800573fc2f3660fc1f019c221e4bedc8051cc6c0c297db9699797%40group.calendar.google.com&src=60877e1a8a8dfba08b542933bfa7f8faedd1d1528f2ada8e0ba91ba67c5074e3%40group.calendar.google.com&src=c_9126b3913ee9069ad38842fe8c2b8fd1ca0ca6a4689554039221089b73cf297b%40group.calendar.google.com&src=d4h4q6l360atpvv3mgj2d4p4lk6l7ggf%40import.calendar.google.com&src=tessa.palokkaran%40outlook.com&src=s22rdh1c5v23u9phjacqsess9incug50%40import.calendar.google.com&showTitle=0&showNav=1&showPrint=0&showTabs=1&showCalendars=1&showTz=0&mode=MONTH&ctz=Europe%2FLondon';
+    f.style = 'border:0;width:100%;height:100%;display:block;';
+    f.frameBorder = '0';
+    c.appendChild(f);
   }
 }
 
