@@ -119,3 +119,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   .shell { flex-direction: column; }
   .main { height: 100vh; }
 }
+
+#view-iframe { padding: 0; height: calc(100vh - 49px); }
+#view-iframe iframe { height: 100%; }

@@ -22,10 +22,10 @@
       <div class="ni" data-view="all"><i class="ti ti-list-check"></i> All Tasks <span class="nb" id="task-badge"></span></div>
       <div class="ni" data-view="completed"><i class="ti ti-circle-check"></i> Completed</div>
       <div class="ns">Apps</div>
-      <div class="ni ext" data-url="https://shoot-planner.ryanballphotography.com"><i class="ti ti-camera"></i> Shoot Planner</div>
-      <div class="ni ext" data-url="https://the-darkroom-production.up.railway.app"><i class="ti ti-moon"></i> The Darkroom</div>
-      <div class="ni ext" data-url="https://app.freeagent.com"><i class="ti ti-receipt"></i> FreeAgent</div>
-      <div class="ni ext" data-url="https://calendar.google.com"><i class="ti ti-calendar"></i> Calendar</div>
+      <div class="ni ext" data-url="https://shoot-planner.ryanballphotography.com" data-label="Shoot Planner"><i class="ti ti-camera"></i> Shoot Planner</div>
+      <div class="ni ext" data-url="https://the-darkroom-production.up.railway.app" data-label="The Darkroom"><i class="ti ti-moon"></i> The Darkroom</div>
+      <div class="ni ext" data-url="https://app.freeagent.com" data-label="FreeAgent"><i class="ti ti-receipt"></i> FreeAgent</div>
+      <div class="ni ext" data-url="https://calendar.google.com" data-label="Google Calendar"><i class="ti ti-calendar"></i> Calendar</div>
     </div>
 
     <div class="main">
@@ -128,6 +128,17 @@
         <button class="btn-save" id="modal-save">Save task</button>
       </div>
     </div>
+  </div>
+
+  <!-- Iframe view -->
+  <div class="view hidden" id="view-iframe">
+    <div id="iframe-blocked" class="hidden" style="text-align:center;padding:3rem;color:var(--text3);">
+      <i class="ti ti-lock" style="font-size:32px;margin-bottom:1rem;display:block;"></i>
+      <div style="font-size:14px;color:var(--text);margin-bottom:0.5rem;" id="iframe-blocked-title">This app blocks embedding</div>
+      <div style="font-size:13px;margin-bottom:1.5rem;" id="iframe-blocked-msg">FreeAgent and Google don't allow their apps to be embedded.</div>
+      <a id="iframe-open-link" href="#" target="_blank" style="font-size:13px;padding:8px 16px;background:var(--text);color:white;border-radius:8px;text-decoration:none;">Open in new tab</a>
+    </div>
+    <iframe id="main-iframe" src="" style="width:100%;height:100%;border:none;display:block;" allowfullscreen></iframe>
   </div>
 
   <script src="app.js"></script>

@@ -31,7 +31,7 @@ function bindNav() {
     });
   });
   document.querySelectorAll('.ni.ext').forEach(el => {
-    el.addEventListener('click', () => window.open(el.dataset.url, '_blank'));
+    el.addEventListener('click', () => loadIframe(el.dataset.url, el.dataset.label || el.textContent.trim(), el));
   });
   document.getElementById('btn-add-task').addEventListener('click', openModal);
 }
@@ -344,5 +344,32 @@ async function generateBriefingWithContext(spData) {
     el.textContent = data.content[0].text;
   } catch (err) {
     el.textContent = shootContext || (tasks.length + ' tasks open.');
+  }
+}
+
+const BLOCKED_DOMAINS = ['freeagent.com', 'google.com', 'calendar.google'];
+
+function loadIframe(url, label, navEl) {
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  if (navEl) navEl.classList.add('active');
+  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+  document.getElementById('view-iframe').classList.remove('hidden');
+  document.getElementById('topbar-title').textContent = label;
+
+  const blocked = BLOCKED_DOMAINS.some(d => url.includes(d));
+  const iframe = document.getElementById('main-iframe');
+  const blockedEl = document.getElementById('iframe-blocked');
+
+  if (blocked) {
+    iframe.style.display = 'none';
+    iframe.src = '';
+    document.getElementById('iframe-blocked-title').textContent = label + ' can\'t be embedded';
+    document.getElementById('iframe-blocked-msg').textContent = 'This app blocks embedding for security reasons.';
+    document.getElementById('iframe-open-link').href = url;
+    blockedEl.classList.remove('hidden');
+  } else {
+    blockedEl.classList.add('hidden');
+    iframe.style.display = 'block';
+    iframe.src = url;
   }
 }
