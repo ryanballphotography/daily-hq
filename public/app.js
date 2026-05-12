@@ -31,7 +31,7 @@ function bindNav() {
     });
   });
   document.querySelectorAll('.ni.ext').forEach(el => {
-    el.addEventListener('click', () => loadIframe(el.dataset.url, el.dataset.label || el.textContent.trim(), el));
+    el.addEventListener('click', () => window.open(el.dataset.url, '_blank'));
   });
   document.getElementById('btn-add-task').addEventListener('click', openModal);
 }
