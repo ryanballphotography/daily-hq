@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setDate();
   loadTasks();
   loadShootPlanner();
+  loadGmailProposals();
   bindNav();
   bindModal();
   bindChat();
@@ -349,6 +350,64 @@ function appendMsg(who, text, isLoading = false) {
   msgs.appendChild(div);
   msgs.scrollTop = msgs.scrollHeight;
   return div.querySelector('.msg-bubble');
+}
+
+
+async function loadGmailProposals() {
+  const el = document.getElementById('gmail-proposals');
+  if (!el) return;
+  el.innerHTML = '<div class="empty" style="padding:0.5rem 0;font-size:12px;">Checking emails...</div>';
+  try {
+    const res = await fetch('/api/gmail-summary');
+    const data = await res.json();
+    if (!data.proposals || !data.proposals.length) {
+      el.innerHTML = '<div class="empty" style="padding:0.5rem 0;font-size:12px;">No emails needing action.</div>';
+      return;
+    }
+    let html = '<div class="section-lbl">Proposed from email <button onclick="loadGmailProposals()" style="font-size:10px;padding:1px 6px;border:0.5px solid var(--border2);border-radius:4px;background:transparent;cursor:pointer;margin-left:6px;">refresh</button></div>';
+    data.proposals.forEach((p, i) => {
+      html += `<div class="task" id="proposal-${i}">
+        <div class="check ${p.priority || 'p3'}"></div>
+        <div class="task-body">
+          <div class="task-title">${p.suggestedTask}</div>
+          <div class="task-meta">
+            <span class="tag tag-work">email</span>
+            <span class="tag">${p.from}</span>
+            <span class="tag">${p.priority}</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px;">${p.action}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
+          <button onclick="acceptProposal(${i})" style="font-size:11px;padding:2px 8px;border:0.5px solid var(--border2);border-radius:4px;background:var(--text);color:white;cursor:pointer;">Accept</button>
+          <button onclick="skipProposal(${i})" style="font-size:11px;padding:2px 8px;border:0.5px solid var(--border2);border-radius:4px;background:transparent;cursor:pointer;">Skip</button>
+        </div>
+      </div>`;
+    });
+    el.innerHTML = html;
+    el._proposals = data.proposals;
+  } catch(e) {
+    el.innerHTML = '<div class="empty" style="padding:0.5rem 0;font-size:12px;">Email check unavailable.</div>';
+  }
+}
+
+async function acceptProposal(i) {
+  const el = document.getElementById('gmail-proposals');
+  const p = el._proposals[i];
+  if (!p) return;
+  await createTask({
+    title: p.suggestedTask,
+    notes: p.action + ' (from: ' + p.from + ')',
+    due_date: new Date().toISOString().split('T')[0],
+    priority: p.priority || 'p3',
+    category: 'work',
+    tag: p.from
+  });
+  document.getElementById('proposal-' + i).remove();
+}
+
+function skipProposal(i) {
+  const el = document.getElementById('proposal-' + i);
+  if (el) el.remove();
 }
 
 function showCalendarView() {
