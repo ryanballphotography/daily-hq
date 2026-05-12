@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setDate();
   loadTasks();
   loadShootPlanner();
+  loadCalendarEvents().then(events => renderCalendarEvents(events));
   bindNav();
   bindModal();
   bindChat();
@@ -248,16 +249,77 @@ function appendMsg(who, text, isLoading = false) {
   return div.querySelector('.msg-bubble');
 }
 
+
+async function loadCalendarEvents() {
+  try {
+    const res = await fetch('/api/calendar');
+    const data = await res.json();
+    return data.events || [];
+  } catch(e) {
+    console.log('Calendar unavailable', e);
+    return [];
+  }
+}
+
+function renderCalendarEvents(events) {
+  const el = document.getElementById('sp-panel');
+  if (!el) return;
+  const today = new Date().toISOString().split('T')[0];
+  const todayEvents = events.filter(e => e.start.split('T')[0] === today);
+  const upcomingEvents = events.filter(e => e.start.split('T')[0] > today);
+  
+  let html = el.innerHTML; // keep existing shoot planner content
+  
+  if (todayEvents.length) {
+    html += '<div class="section-lbl">Today's calendar</div>';
+    html += todayEvents.map(e => `
+      <div class="task">
+        <div class="check" style="border-color:#639922"></div>
+        <div class="task-body">
+          <div class="task-title">${e.title}</div>
+          <div class="task-meta">
+            <span class="tag tag-personal">calendar</span>
+            ${!e.allDay && e.start.includes('T') ? '<span class="task-date">' + new Date(e.start).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}) + '</span>' : ''}
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  if (upcomingEvents.length) {
+    html += '<div class="section-lbl">Coming up</div>';
+    html += upcomingEvents.slice(0, 5).map(e => {
+      const d = new Date(e.start.split('T')[0] + 'T00:00:00');
+      const label = d.toLocaleDateString('en-GB', {weekday:'short', day:'numeric', month:'short'});
+      return `<div class="task">
+        <div class="check" style="border-color:#999"></div>
+        <div class="task-body">
+          <div class="task-title">${e.title}</div>
+          <div class="task-meta">
+            <span class="tag tag-personal">calendar</span>
+            <span class="task-date">${label}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  el.innerHTML = html;
+}
+
 async function loadShootPlanner() {
   try {
     const res = await fetch('/api/shoot-planner');
     const data = await res.json();
     renderShootPlannerPanel(data);
-    generateBriefingWithContext(data);
+    const events = await loadCalendarEvents();
+    renderCalendarEvents(events);
+    generateBriefingWithContext(data, events);
     return data;
   } catch(e) {
     console.log('Shoot Planner unavailable', e);
-    generateBriefingWithContext(null);
+    const events = await loadCalendarEvents();
+    renderCalendarEvents(events);
+    generateBriefingWithContext(null, events);
     return null;
   }
 }
@@ -309,13 +371,18 @@ function renderShootPlannerPanel(data) {
 }
 
 // Override generateBriefing to include shoot planner data
-async function generateBriefingWithContext(spData) {
+async function generateBriefingWithContext(spData, calEvents) {
   const el = document.getElementById('pa-note-text');
   const overdue = tasks.filter(t => isOverdue(t.due_date)).length;
   const dueToday = tasks.filter(t => isDueToday(t.due_date)).length;
   const taskList = tasks.slice(0, 10).map(t => '"' + t.title + '" (' + t.category + ', ' + t.priority + (t.due_date ? ', due ' + formatDate(t.due_date) : '') + ')').join('; ');
 
   let shootContext = '';
+  const todayStr = new Date().toISOString().split('T')[0];
+  if (calEvents && calEvents.length) {
+    const todayCal = calEvents.filter(e => e.start.split('T')[0] === todayStr);
+    if (todayCal.length) shootContext += 'CALENDAR TODAY: ' + todayCal.map(e => e.title + (e.allDay ? '' : ' at ' + new Date(e.start).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}))).join(', ') + '. ';
+  }
   if (spData && spData.shoots && spData.shoots.length) {
     const todayShoots = spData.shoots.filter(s => s.startDate === today);
     const soonShoots = spData.shoots.filter(s => s.startDate !== today);
