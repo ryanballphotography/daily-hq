@@ -271,7 +271,7 @@ function renderCalendarEvents(events) {
   let html = el.innerHTML; // keep existing shoot planner content
   
   if (todayEvents.length) {
-    html += '<div class="section-lbl">Today's calendar</div>';
+    html += '<div class="section-lbl">Today calendar</div>';
     html += todayEvents.map(e => `
       <div class="task">
         <div class="check" style="border-color:#639922"></div>
