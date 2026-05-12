@@ -441,6 +441,60 @@ function loadIframe(url, label, navEl) {
   }
 }
 
+
+async function showCalendarView() {
+  const el = document.getElementById('view-calendar');
+  el.innerHTML = '<div style="padding:1rem;color:var(--text3);font-size:13px;">Loading calendar...</div>';
+  
+  try {
+    const res = await fetch('/api/calendar');
+    const data = await res.json();
+    const events = data.events || [];
+    
+    // Build 14-day view
+    const days = [];
+    for (let i = 0; i < 14; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      days.push(d);
+    }
+    
+    let html = '<div style="padding:1rem;">';
+    
+    days.forEach(day => {
+      const dateStr = day.toISOString().split("T")[0];
+      const isToday = dateStr === new Date().toISOString().split("T")[0];
+      const dayEvents = events.filter(e => e.start.split("T")[0] === dateStr);
+      
+      if (!dayEvents.length && !isToday) return;
+      
+      const dayLabel = day.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
+      
+      html += "<div style=\"margin-bottom:1rem;\">";
+      html += "<div style=\"font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:" + (isToday ? "var(--text)" : "var(--text3)") + ";font-weight:" + (isToday ? "600" : "400") + ";margin-bottom:0.4rem;\">" + (isToday ? "Today — " : "") + dayLabel + "</div>";
+      
+      if (dayEvents.length) {
+        dayEvents.forEach(e => {
+          const time = e.allDay ? "All day" : new Date(e.start).toLocaleTimeString("en-GB", {hour:"2-digit", minute:"2-digit"});
+          html += "<div style=\"display:flex;gap:10px;align-items:flex-start;padding:7px 10px;background:var(--bg2);border-radius:8px;margin-bottom:4px;\">";
+          html += "<span style=\"font-size:11px;color:var(--text3);min-width:45px;margin-top:1px;\">" + time + "</span>";
+          html += "<span style=\"font-size:13px;color:var(--text);\">" + e.title + "</span>";
+          html += "</div>";
+        });
+      } else if (isToday) {
+        html += "<div style=\"font-size:13px;color:var(--text3);padding:7px 10px;\">Nothing scheduled</div>";
+      }
+      
+      html += "</div>";
+    });
+    
+    html += "</div>";
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = "<div style=\"padding:1rem;color:var(--text3);font-size:13px;\">Could not load calendar.</div>";
+  }
+}
+
 function loadCalendar() {
   var c = document.getElementById('view-calendar');
   if (c && !c.querySelector('iframe')) {
