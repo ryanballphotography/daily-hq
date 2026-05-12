@@ -29,6 +29,7 @@ function bindNav() {
       if (view === 'today') renderToday();
       if (view === 'all') renderAll();
       if (view === 'completed') renderCompleted();
+      if (view === 'calendar') showCalendarView();
     });
   });
   document.querySelectorAll('.ni.ext').forEach(el => {
