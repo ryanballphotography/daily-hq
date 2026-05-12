@@ -127,6 +127,7 @@ app.post("/api/pa/briefing", async (req, res) => {
       body: JSON.stringify(req.body)
     });
     const data = await response.json();
+    if (data.quotes) data.quotes = data.quotes.filter(q => q.name && q.name.trim() && q.name !== "New Quote" && q.clientName && q.clientName.trim());
     res.json(data);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -139,6 +140,7 @@ app.post("/api/pa/chat", async (req, res) => {
       body: JSON.stringify(req.body)
     });
     const data = await response.json();
+    if (data.quotes) data.quotes = data.quotes.filter(q => q.name && q.name.trim() && q.name !== "New Quote" && q.clientName && q.clientName.trim());
     res.json(data);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -149,6 +151,7 @@ app.get("/api/shoot-planner", async (req, res) => {
       headers: { "x-api-key": process.env.DAILY_HQ_SECRET }
     });
     const data = await response.json();
+    if (data.quotes) data.quotes = data.quotes.filter(q => q.name && q.name.trim() && q.name !== "New Quote" && q.clientName && q.clientName.trim());
     res.json(data);
   } catch(err) { res.status(500).json({error: err.message}); }
 });
