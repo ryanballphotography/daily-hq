@@ -31,6 +31,8 @@ function bindNav() {
       if (view === 'completed') renderCompleted();
       if (view === 'calendar') showCalendarView();
       if (view === 'inbox') loadInbox();
+      if (view === 'scheduled') renderScheduled();
+      if (view === 'weekly') renderWeekly();
     });
   });
   document.querySelectorAll('.ni.ext').forEach(el => {
@@ -106,7 +108,7 @@ function taskHTML(t) {
   const od = isOverdue(t.due_date);
   const cat = t.category || 'work';
   return `
-    <div class="task" id="task-${t.id}">
+    <div class="task" id="task-${t.id}" ondblclick="editTask(${t.id})">
       <div class="check ${t.priority || ''}" onclick="completeTask(${t.id})"></div>
       <div class="task-body">
         <div class="task-title">${t.title}</div>
@@ -468,6 +470,97 @@ function skipProposal(i) {
   const remaining = document.querySelectorAll('[id^="proposal-"]').length;
   const badge = document.getElementById('inbox-badge');
   if (badge) { badge.textContent = remaining; if (!remaining) badge.style.display = 'none'; }
+}
+
+
+function getWeekDays() {
+  const days = [];
+  const start = new Date();
+  start.setHours(0,0,0,0);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    days.push(d);
+  }
+  return days;
+}
+
+function formatDayLabel(d) {
+  const now = new Date();
+  now.setHours(0,0,0,0);
+  const diff = Math.round((d - now) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+}
+
+function renderScheduled() {
+  const el = document.getElementById('scheduled-tasks');
+  if (!el) return;
+  const dated = tasks.filter(t => t.due_date).sort((a,b) => a.due_date.localeCompare(b.due_date));
+  const undated = tasks.filter(t => !t.due_date);
+  if (!dated.length && !undated.length) { el.innerHTML = '<div class="empty">No tasks scheduled.</div>'; return; }
+  
+  // Group by date
+  const groups = {};
+  dated.forEach(t => {
+    const d = t.due_date.split('T')[0];
+    if (!groups[d]) groups[d] = [];
+    groups[d].push(t);
+  });
+
+  let html = '';
+  Object.keys(groups).sort().forEach(date => {
+    const d = new Date(date + 'T00:00:00');
+    const od = date < today;
+    html += '<div class="sched-day-label' + (od ? ' overdue' : '') + '">' + formatDayLabel(d) + '</div>';
+    html += groups[date].map(taskHTML).join('');
+  });
+  if (undated.length) {
+    html += '<div class="sched-day-label" style="margin-top:1.5rem;">No date</div>';
+    html += undated.map(taskHTML).join('');
+  }
+  el.innerHTML = html || '<div class="empty">Nothing scheduled.</div>';
+}
+
+function renderWeekly() {
+  const el = document.getElementById('weekly-tasks');
+  if (!el) return;
+  const days = getWeekDays();
+  let html = '<div class="week-grid">';
+  days.forEach(d => {
+    const dateStr = d.toISOString().split('T')[0];
+    const dayTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === dateStr);
+    const isToday = dateStr === today;
+    const isPast = dateStr < today;
+    html += '<div class="week-col' + (isToday ? ' week-col-today' : '') + '">';
+    html += '<div class="week-col-header">';
+    html += '<div class="week-day-name">' + d.toLocaleDateString('en-GB', { weekday: 'short' }) + '</div>';
+    html += '<div class="week-day-num' + (isToday ? ' week-day-today' : '') + '">' + d.getDate() + '</div>';
+    html += '</div>';
+    html += '<div class="week-col-body">';
+    if (dayTasks.length) {
+      dayTasks.forEach(t => {
+        const cat = t.category || 'work';
+        html += '<div class="week-task week-task-' + cat + '" ondblclick="editTask(' + t.id + ')" onclick="completeTask(' + t.id + ')">';
+        html += '<div class="week-task-title">' + t.title + '</div>';
+        if (t.tag) html += '<div class="week-task-tag">' + t.tag + '</div>';
+        html += '</div>';
+      });
+    } else {
+      html += '<div class="week-empty">—</div>';
+    }
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  // Tasks with no date
+  const undated = tasks.filter(t => !t.due_date);
+  if (undated.length) {
+    html += '<div class="sched-day-label" style="margin-top:1.5rem;">Unscheduled</div>';
+    html += undated.map(taskHTML).join('');
+  }
+  el.innerHTML = html;
 }
 
 function showCalendarView() {
