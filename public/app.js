@@ -86,6 +86,21 @@ function formatDate(due) {
   return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
+async function editTask(id) {
+  const t = tasks.find(t => t.id === id);
+  if (!t) return;
+  document.getElementById('m-title').value = t.title;
+  document.getElementById('m-notes').value = t.notes || '';
+  document.getElementById('m-due').value = t.due_date ? t.due_date.split('T')[0] : '';
+  document.getElementById('m-priority').value = t.priority || 'p3';
+  document.getElementById('m-category').value = t.category || 'work';
+  document.getElementById('m-recurring').value = t.recurring || '';
+  document.getElementById('m-tag').value = t.tag || '';
+  document.getElementById('modal-bg').classList.remove('hidden');
+  document.getElementById('modal-bg')._editId = id;
+  setTimeout(() => document.getElementById('m-title').focus(), 50);
+}
+
 function taskHTML(t) {
   const od = isOverdue(t.due_date);
   const cat = t.category || 'work';
@@ -101,6 +116,7 @@ function taskHTML(t) {
           ${t.recurring ? '<span class="tag">↻ ' + t.recurring + '</span>' : ''}
         </div>
       </div>
+      <i class="ti ti-pencil task-del" onclick="editTask(${t.id})" style="margin-right:2px;"></i>
       <i class="ti ti-trash task-del" onclick="deleteTask(${t.id})"></i>
     </div>`;
 }
@@ -166,15 +182,53 @@ function closeModal() { document.getElementById("modal-bg").classList.add('hidde
 async function saveModal() {
   const title = document.getElementById('m-title').value.trim();
   if (!title) return;
-  await createTask({
-    title,
-    notes: document.getElementById('m-notes').value,
-    due_date: document.getElementById('m-due').value,
-    priority: document.getElementById('m-priority').value,
-    category: document.getElementById('m-category').value,
-    recurring: document.getElementById('m-recurring').value,
-    tag: document.getElementById('m-tag').value
-  });
+  const due = document.getElementById('m-due').value;
+  const editId = document.getElementById('modal-bg')._editId;
+  if (editId) {
+    // Edit existing task
+    await fetch('/api/tasks/' + editId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title,
+        notes: document.getElementById('m-notes').value,
+        due_date: due || null,
+        priority: document.getElementById('m-priority').value,
+        category: document.getElementById('m-category').value,
+        recurring: document.getElementById('m-recurring').value,
+        tag: document.getElementById('m-tag').value
+      })
+    });
+    const t = tasks.find(t => t.id === editId);
+    if (t) {
+      t.title = title;
+      t.notes = document.getElementById('m-notes').value;
+      t.due_date = due || null;
+      t.priority = document.getElementById('m-priority').value;
+      t.category = document.getElementById('m-category').value;
+      t.recurring = document.getElementById('m-recurring').value;
+      t.tag = document.getElementById('m-tag').value;
+    }
+    document.getElementById('modal-bg')._editId = undefined;
+  } else {
+    await createTask({
+      title,
+      notes: document.getElementById('m-notes').value,
+      due_date: due || null,
+      priority: document.getElementById('m-priority').value,
+      category: document.getElementById('m-category').value,
+      recurring: document.getElementById('m-recurring').value,
+      tag: document.getElementById('m-tag').value
+    });
+    const idx = document.getElementById('modal-bg')._proposalIndex;
+    if (idx !== undefined) {
+      const el = document.getElementById('proposal-' + idx);
+      if (el) el.remove();
+      document.getElementById('modal-bg')._proposalIndex = undefined;
+    }
+  }
+  renderToday();
+  renderAll();
   closeModal();
 }
 
@@ -390,23 +444,21 @@ async function loadGmailProposals() {
   }
 }
 
-async function acceptProposal(i) {
+function acceptProposal(i) {
   const el = document.getElementById('gmail-proposals');
   const p = el._proposals[i];
   if (!p) return;
-  const daysMap = { p1: 0, p2: 3, p3: 7 };
-  const days = daysMap[p.priority] || 3;
-  const due = new Date();
-  due.setDate(due.getDate() + days);
-  await createTask({
-    title: p.suggestedTask,
-    notes: p.action + ' (from: ' + p.from + ')',
-    due_date: due.toISOString().split('T')[0],
-    priority: p.priority || 'p3',
-    category: 'work',
-    tag: p.from
-  });
-  document.getElementById('proposal-' + i).remove();
+  // Open modal pre-filled with proposal data
+  document.getElementById('m-title').value = p.suggestedTask;
+  document.getElementById('m-notes').value = p.action + ' (from: ' + p.from + ')';
+  document.getElementById('m-due').value = '';
+  document.getElementById('m-priority').value = p.priority || 'p3';
+  document.getElementById('m-category').value = 'work';
+  document.getElementById('m-recurring').value = '';
+  document.getElementById('m-tag').value = p.from;
+  document.getElementById('modal-bg').classList.remove('hidden');
+  document.getElementById('modal-bg')._proposalIndex = i;
+  setTimeout(() => document.getElementById('m-title').focus(), 50);
 }
 
 function skipProposal(i) {
