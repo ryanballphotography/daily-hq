@@ -417,7 +417,7 @@ async function loadInbox() {
     const res = await fetch('/api/gmail-summary');
     const data = await res.json();
     if (!data.proposals || !data.proposals.length) {
-      el.innerHTML = '<div class="empty">No emails needing action. You're all caught up.</div>';
+      el.innerHTML = '<div class="empty">No emails needing action. All caught up.</div>';
       if (badge) { badge.style.display = 'none'; }
       return;
     }
