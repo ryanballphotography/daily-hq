@@ -336,12 +336,13 @@ async function generateBriefingWithContext(spData, calEvents) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
-        system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer based in London and Somerset running his own limited company with clients including Lidl, Nando\'s, Ocado, and Ardbeg. The current year is 2026. Give a short direct morning briefing — 2-4 sentences max. Be blunt, no softening. Tell him what to do first and why. IMPORTANT: If UPCOMING SHOOTS lists a shoot as today, he is on a shoot day — lead with that and treat it as the top priority regardless of anything else. If quotes are stale, call it out. If his plate is clear, tell him to enjoy the day. Never list everything — pick the 1-2 things that matter most.',
+        system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer based in London and Somerset running his own limited company with clients including Lidl, Nando\'s, Ocado, and Ardbeg. The current year is 2026. Give a short direct morning briefing. Be blunt, no softening. IMPORTANT: If UPCOMING SHOOTS lists a shoot as today, he is on a shoot day — lead with that. Format your response as: one short punchy sentence summarising the day, then 2-4 bullet points (use • ) each being one specific action or priority. Keep each bullet to one line. Pick the most important things only — never list everything.',
         messages: [{ role: 'user', content: 'Here is my context:\n' + context + '\n\nGive me my morning briefing.' }]
       })
     });
     const data = await res.json();
-    el.textContent = data.content[0].text;
+    const raw = data.content[0].text;
+    el.innerHTML = raw.split('\n').map(line => line.startsWith('•') ? '<div style="display:flex;gap:8px;margin-top:4px;"><span>•</span><span>' + line.slice(1).trim() + '</span></div>' : '<div style="margin-bottom:6px;font-weight:500;">' + line + '</div>').join('');
   } catch (err) {
     el.textContent = shootContext || (tasks.length + ' tasks open.');
   }
