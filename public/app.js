@@ -394,10 +394,14 @@ async function acceptProposal(i) {
   const el = document.getElementById('gmail-proposals');
   const p = el._proposals[i];
   if (!p) return;
+  const daysMap = { p1: 0, p2: 3, p3: 7 };
+  const days = daysMap[p.priority] || 3;
+  const due = new Date();
+  due.setDate(due.getDate() + days);
   await createTask({
     title: p.suggestedTask,
     notes: p.action + ' (from: ' + p.from + ')',
-    due_date: new Date().toISOString().split('T')[0],
+    due_date: due.toISOString().split('T')[0],
     priority: p.priority || 'p3',
     category: 'work',
     tag: p.from
