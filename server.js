@@ -170,7 +170,10 @@ app.get("/api/shoot-planner", async (req, res) => {
 
 app.get("/api/gmail-summary", async (req, res) => {
   try {
-    const response = await fetch("https://shoot-planner.ryanballphotography.com/api/gmail-summary", {
+    const taskRes = await pool.query("SELECT title FROM tasks WHERE done = false");
+    const taskTitles = taskRes.rows.map(r => r.title).join('||');
+    const url = "https://shoot-planner.ryanballphotography.com/api/gmail-summary" + (taskTitles ? "?tasks=" + encodeURIComponent(taskTitles) : "");
+    const response = await fetch(url, {
       headers: { "x-api-key": process.env.DAILY_HQ_SECRET }
     });
     const data = await response.json();
@@ -181,7 +184,10 @@ app.get("/api/gmail-summary", async (req, res) => {
 
 app.get("/api/gmail-summary", async (req, res) => {
   try {
-    const response = await fetch("https://shoot-planner.ryanballphotography.com/api/gmail-summary", {
+    const taskRes = await pool.query("SELECT title FROM tasks WHERE done = false");
+    const taskTitles = taskRes.rows.map(r => r.title).join('||');
+    const url = "https://shoot-planner.ryanballphotography.com/api/gmail-summary" + (taskTitles ? "?tasks=" + encodeURIComponent(taskTitles) : "");
+    const response = await fetch(url, {
       headers: { "x-api-key": process.env.DAILY_HQ_SECRET }
     });
     const data = await response.json();
