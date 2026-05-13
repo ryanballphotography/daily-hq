@@ -408,13 +408,13 @@ function appendMsg(who, text, isLoading = false) {
 }
 
 
-async function loadInbox() {
+async function loadInbox(reset = false) {
   const el = document.getElementById('inbox-proposals');
   const badge = document.getElementById('inbox-badge');
   if (!el) return;
   el.innerHTML = '<div class="empty">Checking emails...</div>';
   try {
-    const res = await fetch('/api/gmail-summary');
+    const res = await fetch('/api/gmail-summary' + (reset ? '?reset=1' : ''));
     const data = await res.json();
     if (!data.proposals || !data.proposals.length) {
       el.innerHTML = '<div class="empty">No emails needing action. All caught up.</div>';
@@ -422,7 +422,7 @@ async function loadInbox() {
       return;
     }
     if (badge) { badge.textContent = data.proposals.length; badge.style.display = 'inline'; }
-    let html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;"><div style="font-size:13px;font-weight:500;">' + data.proposals.length + ' email' + (data.proposals.length !== 1 ? 's' : '') + ' needing action</div><button onclick="loadInbox()" style="font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:6px;background:transparent;cursor:pointer;">Refresh</button></div>';
+    let html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;"><div style="font-size:13px;font-weight:500;">' + data.proposals.length + ' email' + (data.proposals.length !== 1 ? 's' : '') + ' needing action</div><button onclick="loadInbox(true)" style="font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:6px;background:transparent;cursor:pointer;">Refresh</button></div>';
     data.proposals.forEach((p, i) => {
       html += `<div class="inbox-card" id="proposal-${i}">
         <div class="inbox-card-header">
