@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setDate();
   loadTasks();
   loadShootPlanner();
-  loadGmailProposals();
+  loadInbox();
   bindNav();
   bindModal();
   bindChat();
@@ -30,6 +30,7 @@ function bindNav() {
       if (view === 'all') renderAll();
       if (view === 'completed') renderCompleted();
       if (view === 'calendar') showCalendarView();
+      if (view === 'inbox') loadInbox();
     });
   });
   document.querySelectorAll('.ni.ext').forEach(el => {
@@ -407,40 +408,39 @@ function appendMsg(who, text, isLoading = false) {
 }
 
 
-async function loadGmailProposals() {
-  const el = document.getElementById('gmail-proposals');
+async function loadInbox() {
+  const el = document.getElementById('inbox-proposals');
+  const badge = document.getElementById('inbox-badge');
   if (!el) return;
-  el.innerHTML = '<div class="empty" style="padding:0.5rem 0;font-size:12px;">Checking emails...</div>';
+  el.innerHTML = '<div class="empty">Checking emails...</div>';
   try {
     const res = await fetch('/api/gmail-summary');
     const data = await res.json();
     if (!data.proposals || !data.proposals.length) {
-      el.innerHTML = '<div class="empty" style="padding:0.5rem 0;font-size:12px;">No emails needing action.</div>';
+      el.innerHTML = '<div class="empty">No emails needing action. You're all caught up.</div>';
+      if (badge) { badge.style.display = 'none'; }
       return;
     }
-    let html = '<div class="section-lbl">Proposed from email <button onclick="loadGmailProposals()" style="font-size:10px;padding:1px 6px;border:0.5px solid var(--border2);border-radius:4px;background:transparent;cursor:pointer;margin-left:6px;">refresh</button></div>';
+    if (badge) { badge.textContent = data.proposals.length; badge.style.display = 'inline'; }
+    let html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;"><div style="font-size:13px;font-weight:500;">' + data.proposals.length + ' email' + (data.proposals.length !== 1 ? 's' : '') + ' needing action</div><button onclick="loadInbox()" style="font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:6px;background:transparent;cursor:pointer;">Refresh</button></div>';
     data.proposals.forEach((p, i) => {
-      html += `<div class="task" id="proposal-${i}">
-        <div class="check ${p.priority || 'p3'}"></div>
-        <div class="task-body">
-          <div class="task-title">${p.suggestedTask}</div>
-          <div class="task-meta">
-            <span class="tag tag-work">email</span>
-            <span class="tag">${p.from}</span>
-            <span class="tag">${p.priority}</span>
-          </div>
-          <div style="font-size:11px;color:var(--text3);margin-top:3px;">${p.action}</div>
+      html += `<div class="inbox-card" id="proposal-${i}">
+        <div class="inbox-card-header">
+          <div class="inbox-from">${p.from}</div>
+          <span class="tag tag-${p.priority === 'p1' ? 'work' : p.priority === 'p2' ? 'home' : 'personal'}" style="font-size:10px;">${p.priority === 'p1' ? 'Urgent' : p.priority === 'p2' ? 'This week' : 'Low priority'}</span>
         </div>
-        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
-          <button onclick="acceptProposal(${i})" style="font-size:11px;padding:2px 8px;border:0.5px solid var(--border2);border-radius:4px;background:var(--text);color:white;cursor:pointer;">Accept</button>
-          <button onclick="skipProposal(${i})" style="font-size:11px;padding:2px 8px;border:0.5px solid var(--border2);border-radius:4px;background:transparent;cursor:pointer;">Skip</button>
+        <div class="inbox-subject">${p.subject}</div>
+        <div class="inbox-action">${p.action}</div>
+        <div class="inbox-buttons">
+          <button class="inbox-btn-accept" onclick="acceptProposal(${i})">+ Add to tasks</button>
+          <button class="inbox-btn-skip" onclick="skipProposal(${i})">Skip</button>
         </div>
       </div>`;
     });
     el.innerHTML = html;
     el._proposals = data.proposals;
   } catch(e) {
-    el.innerHTML = '<div class="empty" style="padding:0.5rem 0;font-size:12px;">Email check unavailable.</div>';
+    el.innerHTML = '<div class="empty">Email check unavailable.</div>';
   }
 }
 

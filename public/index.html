@@ -18,6 +18,7 @@
       <div class="ns">Focus</div>
       <div class="ni active" data-view="today"><i class="ti ti-layout-dashboard"></i> Today</div>
       <div class="ni" data-view="chat"><i class="ti ti-message-circle"></i> PA Chat</div>
+      <div class="ni" data-view="inbox"><i class="ti ti-inbox"></i> Inbox <span class="nb" id="inbox-badge" style="display:none"></span></div>
       <div class="ns">Tasks</div>
       <div class="ni" data-view="all"><i class="ti ti-list-check"></i> All Tasks <span class="nb" id="task-badge"></span></div>
       <div class="ni" data-view="completed"><i class="ti ti-circle-check"></i> Completed</div>
@@ -43,8 +44,7 @@
           <div class="pa-note-text" id="pa-note-text">Loading your briefing...</div>
         </div>
         <div id="today-tasks"></div>
-        <div id="gmail-proposals"></div>
-      <div id="sp-panel"></div>
+        <div id="sp-panel"></div>
       </div>
 
       <!-- All tasks view -->
@@ -71,6 +71,11 @@
             <button class="send-btn" id="chat-send"><i class="ti ti-send"></i></button>
           </div>
         </div>
+      </div>
+
+      <!-- Inbox view -->
+      <div class="view hidden" id="view-inbox">
+        <div id="inbox-proposals"></div>
       </div>
 
       <!-- Calendar view — MUST be inside .main -->

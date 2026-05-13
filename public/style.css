@@ -125,3 +125,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 #view-calendar { padding: 0 !important; height: calc(100vh - 49px) !important; }
 #view-calendar iframe { width: 100% !important; height: 100% !important; border: none !important; display: block; }
+
+.inbox-card { border: 0.5px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 0.75rem; background: var(--bg); }
+.inbox-card:hover { border-color: var(--border2); }
+.inbox-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.inbox-from { font-size: 12px; font-weight: 500; color: var(--text); }
+.inbox-subject { font-size: 13px; color: var(--text); margin-bottom: 6px; }
+.inbox-action { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 12px; }
+.inbox-buttons { display: flex; gap: 8px; }
+.inbox-btn-accept { font-size: 12px; padding: 6px 14px; border: none; border-radius: var(--radius); background: var(--text); color: white; cursor: pointer; }
+.inbox-btn-accept:hover { opacity: 0.85; }
+.inbox-btn-skip { font-size: 12px; padding: 6px 14px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: transparent; color: var(--text2); cursor: pointer; }
+.inbox-btn-skip:hover { background: var(--bg2); }
