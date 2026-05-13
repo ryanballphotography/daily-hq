@@ -445,7 +445,7 @@ async function loadInbox() {
 }
 
 function acceptProposal(i) {
-  const el = document.getElementById('gmail-proposals');
+  const el = document.getElementById('inbox-proposals');
   const p = el._proposals[i];
   if (!p) return;
   // Open modal pre-filled with proposal data
@@ -464,6 +464,9 @@ function acceptProposal(i) {
 function skipProposal(i) {
   const el = document.getElementById('proposal-' + i);
   if (el) el.remove();
+  const remaining = document.querySelectorAll('[id^="proposal-"]').length;
+  const badge = document.getElementById('inbox-badge');
+  if (badge) { badge.textContent = remaining; if (!remaining) badge.style.display = 'none'; }
 }
 
 function showCalendarView() {
