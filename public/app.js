@@ -127,20 +127,23 @@ function taskHTML(t) {
 }
 
 function sortTasks(list) {
+  const pOrder = { p1: 1, p2: 2, p3: 3 };
   return list.sort((a, b) => {
     const aOver = isOverdue(a.due_date);
     const bOver = isOverdue(b.due_date);
-    const aToday = isDueToday(a.due_date);
-    const bToday = isDueToday(b.due_date);
-    const pOrder = { p1: 1, p2: 2, p3: 3 };
-    // Overdue first
+    // Overdue first, sorted by date then priority
     if (aOver && !bOver) return -1;
     if (!aOver && bOver) return 1;
-    // Then by date
-    if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+    // Both have dates - sort by date first, then priority
+    if (a.due_date && b.due_date) {
+      const dateDiff = a.due_date.localeCompare(b.due_date);
+      if (dateDiff !== 0) return dateDiff;
+      return (pOrder[a.priority] || 3) - (pOrder[b.priority] || 3);
+    }
+    // Dated tasks before undated
     if (a.due_date && !b.due_date) return -1;
     if (!a.due_date && b.due_date) return 1;
-    // Then by priority
+    // Both undated - sort by priority
     return (pOrder[a.priority] || 3) - (pOrder[b.priority] || 3);
   });
 }
@@ -427,7 +430,7 @@ async function sendChat() {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
-        system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nando\'s, Ocado, Ardbeg. Be direct and blunt — no softening, no hedging. Short sentences. One clear answer, not options. Connect advice to real consequences. Money and client emails always come first. He avoids sending estimates and following up with clients — call this out. He does admin late at night which hurts his sleep — push him to do it earlier. Creative work and gardening are legitimate productivity. When he asks if he can do something enjoyable, check his tasks and give a straight yes or no with one reason.\n\nHis open tasks:\n' + taskContext + '\n\nCalendar events (next 14 days):\n' + calendarContext,
+        system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nando\'s, Ocado, Ardbeg. The current date and time is ' + new Date().toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'}) + ' at ' + new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}) + '. Be direct and blunt — no softening, no hedging. Short sentences. One clear answer, not options. Connect advice to real consequences. Money and client emails always come first. He avoids sending estimates and following up with clients — call this out. He does admin late at night which hurts his sleep — push him to do it earlier. Creative work and gardening are legitimate productivity. When he asks if he can do something enjoyable, check his tasks and give a straight yes or no with one reason.\n\nHis open tasks:\n' + taskContext + '\n\nCalendar events (next 14 days):\n' + calendarContext,
         messages: chatHistory
       })
     });
