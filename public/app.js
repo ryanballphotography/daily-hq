@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setDate();
   loadTasks();
   loadShootPlanner();
-  loadInbox();
   bindNav();
   bindModal();
   bindChat();
@@ -30,7 +29,7 @@ function bindNav() {
       if (view === 'all') renderAll();
       if (view === 'completed') renderCompleted();
       if (view === 'calendar') showCalendarView();
-      if (view === 'inbox') loadInbox();
+      if (view === 'inbox') showInboxPrompt();
       if (view === 'scheduled') renderScheduled();
       if (view === 'weekly') renderWeekly();
     });
@@ -423,6 +422,14 @@ function appendMsg(who, text, isLoading = false) {
   return div.querySelector('.msg-bubble');
 }
 
+
+
+function showInboxPrompt() {
+  const el = document.getElementById('inbox-proposals');
+  if (!el) return;
+  if (el._loaded) return;
+  el.innerHTML = '<div style="text-align:center;padding:3rem 1rem;"><div style="font-size:13px;color:var(--text2);margin-bottom:1rem;">Check your inbox for emails needing action</div><button onclick="loadInbox()" style="font-size:13px;padding:8px 20px;border:none;border-radius:var(--radius);background:var(--text);color:white;cursor:pointer;">Check emails</button></div>';
+}
 
 async function loadInbox(reset = false) {
   const el = document.getElementById('inbox-proposals');
