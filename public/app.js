@@ -655,7 +655,8 @@ async function generateWeeklyPlan(spData, calEvents) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
-        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week. Be direct and opinionated - tell him specifically when to do things. Consider shoot days as blocked. Highlight overloaded or light days. Format: one punchy sentence about the week shape, then day-by-day with day name in caps and bullet points using the bullet character. End with a Watch out line if anything is at risk. Keep bullets to one line.",
+        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week and produce a practical work plan. Important rules: (1) Shoot days are hard blocks - no work. (2) Kids and family calendar events are background context only - Ryan is aware of them and works around them, do not treat them as work blockers unless they are overnight stays or explicitly take the whole day. (3) Focus on work priorities, deadlines, and when to do specific tasks. (4) Only flag family commitments if they genuinely affect work capacity e.g. a pickup at 3pm means finish work by 2:30pm. Format: one punchy sentence about the week, then day-by-day with day name in caps and bullet points. End with a Watch out line only for genuine work risks. Keep bullets to one line.",
+
         messages: [{ role: 'user', content: context + '\n\nGive me my weekly plan.' }]
       })
     });
@@ -745,7 +746,8 @@ async function generateWeeklyPlan(spData, calEvents) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
-        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week. Be direct and opinionated - tell him specifically when to do things. Consider shoot days as blocked. Highlight overloaded or light days. Format: one punchy sentence about the week shape, then day-by-day with day name in caps and bullet points using the bullet character. End with a Watch out line if anything is at risk. Keep bullets to one line.",
+        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week and produce a practical work plan. Important rules: (1) Shoot days are hard blocks - no work. (2) Kids and family calendar events are background context only - Ryan is aware of them and works around them, do not treat them as work blockers unless they are overnight stays or explicitly take the whole day. (3) Focus on work priorities, deadlines, and when to do specific tasks. (4) Only flag family commitments if they genuinely affect work capacity e.g. a pickup at 3pm means finish work by 2:30pm. Format: one punchy sentence about the week, then day-by-day with day name in caps and bullet points. End with a Watch out line only for genuine work risks. Keep bullets to one line.",
+
         messages: [{ role: 'user', content: context + '\n\nGive me my weekly plan.' }]
       })
     });
@@ -835,7 +837,8 @@ async function generateWeeklyPlan(spData, calEvents) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
-        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week. Be direct and opinionated - tell him specifically when to do things. Consider shoot days as blocked. Highlight overloaded or light days. Format: one punchy sentence about the week shape, then day-by-day with day name in caps and bullet points using the bullet character. End with a Watch out line if anything is at risk. Keep bullets to one line.",
+        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week and produce a practical work plan. Important rules: (1) Shoot days are hard blocks - no work. (2) Kids and family calendar events are background context only - Ryan is aware of them and works around them, do not treat them as work blockers unless they are overnight stays or explicitly take the whole day. (3) Focus on work priorities, deadlines, and when to do specific tasks. (4) Only flag family commitments if they genuinely affect work capacity e.g. a pickup at 3pm means finish work by 2:30pm. Format: one punchy sentence about the week, then day-by-day with day name in caps and bullet points. End with a Watch out line only for genuine work risks. Keep bullets to one line.",
+
         messages: [{ role: 'user', content: context + '\n\nGive me my weekly plan.' }]
       })
     });
@@ -925,7 +928,8 @@ async function generateWeeklyPlan(spData, calEvents) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1500,
-        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week. Be direct and opinionated - tell him specifically when to do things. Consider shoot days as blocked. Highlight overloaded or light days. Format: one punchy sentence about the week shape, then day-by-day with day name in caps and bullet points using the bullet character. End with a Watch out line if anything is at risk. Keep bullets to one line.",
+        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week and produce a practical work plan. Important rules: (1) Shoot days are hard blocks - no work. (2) Kids and family calendar events are background context only - Ryan is aware of them and works around them, do not treat them as work blockers unless they are overnight stays or explicitly take the whole day. (3) Focus on work priorities, deadlines, and when to do specific tasks. (4) Only flag family commitments if they genuinely affect work capacity e.g. a pickup at 3pm means finish work by 2:30pm. Format: one punchy sentence about the week, then day-by-day with day name in caps and bullet points. End with a Watch out line only for genuine work risks. Keep bullets to one line.",
+
         messages: [{ role: 'user', content: context + '\n\nGive me my weekly plan.' }]
       })
     });
