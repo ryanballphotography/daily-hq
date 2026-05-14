@@ -25,9 +25,12 @@ async function initDB() {
       completed_at TIMESTAMP,
       snoozed_until DATE,
       source VARCHAR(50) DEFAULT 'manual',
+      time_block VARCHAR(20) DEFAULT NULL,
       created_at TIMESTAMP DEFAULT NOW()
     )
   `);
+  // Add time_block column if it doesn't exist (for existing DBs)
+  await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time_block VARCHAR(20) DEFAULT NULL`);
   console.log('DB ready');
 }
 
@@ -207,6 +210,18 @@ app.post("/api/gmail-skip", async (req, res) => {
     });
     const data = await response.json();
     res.json(data);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+
+app.patch("/api/tasks/:id/timeblock", async (req, res) => {
+  const { time_block } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE tasks SET time_block = $1 WHERE id = $2 RETURNING *',
+      [time_block || null, req.params.id]
+    );
+    res.json(result.rows[0]);
   } catch(err) { res.status(500).json({error: err.message}); }
 });
 

@@ -592,56 +592,113 @@ function renderScheduled() {
   el.innerHTML = html || '<div class="empty">Nothing scheduled.</div>';
 }
 
+const BLOCKS = [
+  { id: 'morning', label: 'Morning', time: '8am - 12pm' },
+  { id: 'afternoon', label: 'Afternoon', time: '12pm - 6pm' },
+  { id: 'evening', label: 'Evening', time: '6pm - 9pm' }
+];
+
 function renderWeekly() {
   const el = document.getElementById('weekly-tasks');
-  generateWeeklyPlan(window._spData || null, window._calEvents || []);
   if (!el) return;
-  // Load weekly PA plan
-  if (window._spData !== undefined || window._calEvents !== undefined) {
-    generateWeeklyPlan(window._spData || null, window._calEvents || []);
-  } else {
-    loadShootPlanner().then(spData => {
-      loadCalendarEvents().then(calEvents => {
-        generateWeeklyPlan(spData, calEvents);
-      });
-    });
-  }
+  generateWeeklyPlan(window._spData || null, window._calEvents || []);
   const days = getWeekDays();
-  let html = '<div class="week-grid">';
+
+  let html = '<div class="week-grid-blocks">';
+  html += '<div class="wgb-header-row">';
+  html += '<div class="wgb-block-col"></div>';
   days.forEach(d => {
     const dateStr = d.toISOString().split('T')[0];
-    const dayTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === dateStr);
     const isToday = dateStr === today;
-    const isPast = dateStr < today;
-    html += '<div class="week-col' + (isToday ? ' week-col-today' : '') + '">';
-    html += '<div class="week-col-header">';
-    html += '<div class="week-day-name">' + d.toLocaleDateString('en-GB', { weekday: 'short' }) + '</div>';
-    html += '<div class="week-day-num' + (isToday ? ' week-day-today' : '') + '">' + d.getDate() + '</div>';
+    html += '<div class="wgb-day-header' + (isToday ? ' wgb-today' : '') + '">';
+    html += '<div class="wgb-day-name">' + d.toLocaleDateString('en-GB', { weekday: 'short' }) + '</div>';
+    html += '<div class="wgb-day-num' + (isToday ? ' wgb-day-num-today' : '') + '">' + d.getDate() + '</div>';
     html += '</div>';
-    html += '<div class="week-col-body">';
-    if (dayTasks.length) {
-      dayTasks.forEach(t => {
-        const cat = t.category || 'work';
-        html += '<div class="week-task week-task-' + cat + '" ondblclick="editTask(' + t.id + ')" onclick="completeTask(' + t.id + ')">';
-        html += '<div class="week-task-title">' + t.title + '</div>';
-        if (t.tag) html += '<div class="week-task-tag">' + t.tag + '</div>';
-        html += '</div>';
-      });
-    } else {
-      html += '<div class="week-empty">—</div>';
-    }
-    html += '</div></div>';
   });
   html += '</div>';
 
-  // Tasks with no date
-  const undated = tasks.filter(t => !t.due_date);
-  if (undated.length) {
-    html += '<div class="sched-day-label" style="margin-top:1.5rem;">Unscheduled</div>';
-    html += undated.map(taskHTML).join('');
+  BLOCKS.forEach(block => {
+    html += '<div class="wgb-row">';
+    html += '<div class="wgb-block-col"><div class="wgb-block-label">' + block.label + '</div><div class="wgb-block-time">' + block.time + '</div></div>';
+    days.forEach(d => {
+      const dateStr = d.toISOString().split('T')[0];
+      const isToday = dateStr === today;
+      const cellTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === dateStr && t.time_block === block.id);
+      html += '<div class="wgb-cell' + (isToday ? ' wgb-cell-today' : '') + '" data-date="' + dateStr + '" data-block="' + block.id + '" ondragover="event.preventDefault()" ondrop="dropTask(event)">';
+      cellTasks.forEach(t => {
+        const cat = t.category || 'work';
+        html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
+        html += '<div class="wgb-task-title">' + t.title + '</div>';
+        if (t.tag) html += '<div class="wgb-task-tag">' + t.tag + '</div>';
+        html += '</div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  const unscheduled = tasks.filter(t => !t.due_date || !t.time_block);
+  html += '<div class="wgb-unscheduled">';
+  html += '<div class="wgb-unscheduled-label">Unscheduled - drag to schedule</div>';
+  html += '<div class="wgb-unscheduled-tasks" ondragover="event.preventDefault()" ondrop="dropTaskUnscheduled(event)">';
+  if (unscheduled.length) {
+    unscheduled.forEach(t => {
+      const cat = t.category || 'work';
+      html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
+      html += '<div class="wgb-task-title">' + t.title + '</div>';
+      if (t.due_date) html += '<div class="wgb-task-tag">' + formatDate(t.due_date) + '</div>';
+      html += '</div>';
+    });
+  } else {
+    html += '<div style="font-size:12px;color:var(--text3);">All tasks scheduled.</div>';
   }
+  html += '</div></div>';
+  html += '</div>';
   el.innerHTML = html;
 }
+
+let draggedTaskId = null;
+
+function dragTask(event, id) {
+  draggedTaskId = id;
+  event.dataTransfer.effectAllowed = 'move';
+}
+
+async function dropTask(event) {
+  event.preventDefault();
+  if (!draggedTaskId) return;
+  const cell = event.currentTarget;
+  const date = cell.dataset.date;
+  const block = cell.dataset.block;
+  const task = tasks.find(t => t.id === draggedTaskId);
+  if (!task) return;
+  await fetch('/api/tasks/' + draggedTaskId, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ due_date: date, time_block: block })
+  });
+  task.due_date = date;
+  task.time_block = block;
+  draggedTaskId = null;
+  renderWeekly();
+}
+
+async function dropTaskUnscheduled(event) {
+  event.preventDefault();
+  if (!draggedTaskId) return;
+  const task = tasks.find(t => t.id === draggedTaskId);
+  if (!task) return;
+  await fetch('/api/tasks/' + draggedTaskId, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ due_date: null, time_block: null })
+  });
+  task.due_date = null;
+  task.time_block = null;
+  draggedTaskId = null;
+  renderWeekly();
+}
+
 
 
 async function generateWeeklyPlan(spData, calEvents) {

@@ -186,3 +186,58 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .conv-item:hover { background: var(--bg2); }
 .conv-item-date { font-size: 11px; color: var(--text3); margin-bottom: 3px; }
 .conv-item-preview { font-size: 13px; color: var(--text2); }
+
+/* ── Weekly block grid ── */
+.week-grid-blocks { display: flex; flex-direction: column; gap: 0; }
+.wgb-header-row { display: grid; grid-template-columns: 100px repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+.wgb-day-header { text-align: center; padding: 8px 4px; }
+.wgb-today { background: var(--bg2); border-radius: var(--radius); }
+.wgb-day-name { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); }
+.wgb-day-num { font-size: 20px; font-weight: 500; color: var(--text); margin-top: 2px; }
+.wgb-day-num-today { background: var(--text); color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; margin: 2px auto 0; font-size: 15px; }
+.wgb-row { display: grid; grid-template-columns: 100px repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+.wgb-block-col { display: flex; flex-direction: column; justify-content: center; padding: 8px 0; }
+.wgb-block-label { font-size: 12px; font-weight: 500; color: var(--text2); }
+.wgb-block-time { font-size: 10px; color: var(--text3); margin-top: 2px; }
+.wgb-cell { min-height: 80px; border: 0.5px solid var(--border); border-radius: var(--radius); padding: 6px; display: flex; flex-direction: column; gap: 4px; transition: background 0.1s; }
+.wgb-cell:hover { background: var(--bg2); }
+.wgb-cell-today { border-color: var(--border2); background: var(--bg2); }
+.wgb-cell[ondragover] { border-color: var(--text); }
+.wgb-task { padding: 5px 7px; border-radius: 5px; cursor: grab; font-size: 11px; line-height: 1.3; }
+.wgb-task:active { cursor: grabbing; opacity: 0.7; }
+.wgb-task-work { background: #E6F1FB; color: #0C447C; }
+.wgb-task-exercise { background: #EAF3DE; color: #3B6D11; }
+.wgb-task-home { background: #FAEEDA; color: #854F0B; }
+.wgb-task-personal { background: #EEEDFE; color: #3C3489; }
+.wgb-task-title { font-weight: 500; }
+.wgb-task-tag { font-size: 10px; opacity: 0.7; margin-top: 2px; }
+.wgb-unscheduled { margin-top: 1.5rem; border-top: 0.5px solid var(--border); padding-top: 1rem; }
+.wgb-unscheduled-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text3); margin-bottom: 0.75rem; }
+.wgb-unscheduled-tasks { display: flex; flex-wrap: wrap; gap: 6px; min-height: 50px; padding: 8px; border: 0.5px dashed var(--border); border-radius: var(--radius); }
+
+/* ── Weekly block grid ── */
+.week-grid-blocks { display: flex; flex-direction: column; gap: 4px; }
+.wgb-header-row { display: grid; grid-template-columns: 90px repeat(7, 1fr); gap: 4px; margin-bottom: 4px; }
+.wgb-day-header { text-align: center; padding: 8px 4px; }
+.wgb-today { background: var(--bg2); border-radius: var(--radius); }
+.wgb-day-name { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); }
+.wgb-day-num { font-size: 20px; font-weight: 500; color: var(--text); margin-top: 2px; }
+.wgb-day-num-today { background: var(--text); color: white; border-radius: 50%; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; margin: 2px auto 0; font-size: 15px; }
+.wgb-row { display: grid; grid-template-columns: 90px repeat(7, 1fr); gap: 4px; }
+.wgb-block-col { display: flex; flex-direction: column; justify-content: center; padding: 4px 0; }
+.wgb-block-label { font-size: 12px; font-weight: 500; color: var(--text2); }
+.wgb-block-time { font-size: 10px; color: var(--text3); margin-top: 1px; }
+.wgb-cell { min-height: 80px; border: 0.5px solid var(--border); border-radius: var(--radius); padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.wgb-cell:hover { background: var(--bg2); border-color: var(--border2); }
+.wgb-cell-today { background: var(--bg2); }
+.wgb-task { padding: 5px 7px; border-radius: 5px; cursor: grab; font-size: 11px; line-height: 1.3; }
+.wgb-task:active { cursor: grabbing; opacity: 0.7; }
+.wgb-task-work { background: #E6F1FB; color: #0C447C; }
+.wgb-task-exercise { background: #EAF3DE; color: #3B6D11; }
+.wgb-task-home { background: #FAEEDA; color: #854F0B; }
+.wgb-task-personal { background: #EEEDFE; color: #3C3489; }
+.wgb-task-title { font-weight: 500; }
+.wgb-task-tag { font-size: 10px; opacity: 0.7; margin-top: 2px; }
+.wgb-unscheduled { margin-top: 1.5rem; border-top: 0.5px solid var(--border); padding-top: 1rem; }
+.wgb-unscheduled-label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--text3); margin-bottom: 0.75rem; }
+.wgb-unscheduled-tasks { display: flex; flex-wrap: wrap; gap: 6px; min-height: 50px; padding: 8px; border: 0.5px dashed var(--border); border-radius: var(--radius); }
