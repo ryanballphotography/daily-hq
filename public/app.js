@@ -1,4 +1,7 @@
-const today = new Date().toISOString().split('T')[0];
+const today = (() => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+})();
 let tasks = [];
 let chatHistory = [];
 
@@ -603,60 +606,6 @@ function renderWeekly() {
   if (!el) return;
   renderWeeklyGrid();
   generateWeeklyPlan(window._spData || null, window._calEvents || []);
-  return;
-  const days = getWeekDays();
-
-  let html = '<div class="week-grid-blocks">';
-  html += '<div class="wgb-header-row">';
-  html += '<div class="wgb-block-col"></div>';
-  days.forEach(d => {
-    const dateStr = d.toISOString().split('T')[0];
-    const isToday = dateStr === today;
-    html += '<div class="wgb-day-header' + (isToday ? ' wgb-today' : '') + '">';
-    html += '<div class="wgb-day-name">' + d.toLocaleDateString('en-GB', { weekday: 'short' }) + '</div>';
-    html += '<div class="wgb-day-num' + (isToday ? ' wgb-day-num-today' : '') + '">' + d.getDate() + '</div>';
-    html += '</div>';
-  });
-  html += '</div>';
-
-  BLOCKS.forEach(block => {
-    html += '<div class="wgb-row">';
-    html += '<div class="wgb-block-col"><div class="wgb-block-label">' + block.label + '</div><div class="wgb-block-time">' + block.time + '</div></div>';
-    days.forEach(d => {
-      const dateStr = d.toISOString().split('T')[0];
-      const isToday = dateStr === today;
-      const cellTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === dateStr && t.time_block === block.id);
-      html += '<div class="wgb-cell' + (isToday ? ' wgb-cell-today' : '') + '" data-date="' + dateStr + '" data-block="' + block.id + '" ondragover="event.preventDefault()" ondrop="dropTask(event)">';
-      cellTasks.forEach(t => {
-        const cat = t.category || 'work';
-        html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
-        html += '<div class="wgb-task-title">' + t.title + '</div>';
-        if (t.tag) html += '<div class="wgb-task-tag">' + t.tag + '</div>';
-        html += '</div>';
-      });
-      html += '</div>';
-    });
-    html += '</div>';
-  });
-
-  const unscheduled = tasks.filter(t => !t.due_date || !t.time_block);
-  html += '<div class="wgb-unscheduled">';
-  html += '<div class="wgb-unscheduled-label">Unscheduled - drag to schedule</div>';
-  html += '<div class="wgb-unscheduled-tasks" ondragover="event.preventDefault()" ondrop="dropTaskUnscheduled(event)">';
-  if (unscheduled.length) {
-    unscheduled.forEach(t => {
-      const cat = t.category || 'work';
-      html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
-      html += '<div class="wgb-task-title">' + t.title + '</div>';
-      if (t.due_date) html += '<div class="wgb-task-tag">' + formatDate(t.due_date) + '</div>';
-      html += '</div>';
-    });
-  } else {
-    html += '<div style="font-size:12px;color:var(--text3);">All tasks scheduled.</div>';
-  }
-  html += '</div></div>';
-  html += '</div>';
-  el.innerHTML = html;
 }
 
 let draggedTaskId = null;
@@ -752,7 +701,9 @@ async function generateWeeklyPlan(spData, calEvents) {
     });
     const data = await res.json();
     const raw = data.content[0].text.replace(/```json|```/g, '').trim();
+    console.log('Weekly PA raw:', raw);
     const parsed = JSON.parse(raw);
+    console.log('Weekly PA parsed:', JSON.stringify(parsed));
     window._weeklyDaySummaries = parsed.days || {};
     window._weekSummary = parsed.weekSummary || '';
     window._weekWatchOut = parsed.watchOut || '';
