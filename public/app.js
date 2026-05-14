@@ -829,20 +829,40 @@ function renderWeeklyGrid() {
   });
   html += '</div>';
 
-  const unscheduled = tasks.filter(t => !t.due_date || !t.time_block);
+  // No time row - tasks with a date but no time block
+  html += '<div class="wgb-row">';
+  html += '<div class="wgb-block-col"><div class="wgb-block-label">No time</div><div class="wgb-block-time">unassigned</div></div>';
+  days.forEach(d => {
+    const dateStr = localDateStr(d);
+    const isToday = dateStr === today;
+    const noTimeTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === dateStr && !t.time_block).sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
+    html += '<div class="wgb-cell wgb-cell-notime' + (isToday ? ' wgb-cell-today' : '') + '" data-date="' + dateStr + '" data-block="" ondragover="event.preventDefault()" ondrop="dropTask(event)">';
+    noTimeTasks.forEach(t => {
+      const cat = t.category || 'work';
+      html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" data-task-id="' + t.id + '" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
+      html += '<div class="wgb-task-title">' + t.title + '</div>';
+      if (t.tag) html += '<div class="wgb-task-tag">' + t.tag + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  html += '</div>';
+  html += '</div>';
+
+  // Unscheduled - NO date at all
+  const unscheduled = tasks.filter(t => !t.due_date);
   html += '<div class="wgb-unscheduled">';
-  html += '<div class="wgb-unscheduled-label">Unscheduled \u2014 drag to schedule</div>';
+  html += '<div class="wgb-unscheduled-label">Unscheduled \u2014 no date assigned</div>';
   html += '<div class="wgb-unscheduled-tasks" ondragover="event.preventDefault()" ondrop="dropTaskUnscheduled(event)">';
   if (unscheduled.length) {
     unscheduled.forEach(t => {
       const cat = t.category || 'work';
-      html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
+      html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" data-task-id="' + t.id + '" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
       html += '<div class="wgb-task-title">' + t.title + '</div>';
-      if (t.due_date) html += '<div class="wgb-task-tag">' + formatDate(t.due_date) + '</div>';
       html += '</div>';
     });
   } else {
-    html += '<div style="font-size:12px;color:var(--text3);">All tasks scheduled.</div>';
+    html += '<div style="font-size:12px;color:var(--text3);">All tasks have dates.</div>';
   }
   html += '</div></div>';
   el.innerHTML = html;
