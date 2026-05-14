@@ -15,39 +15,70 @@
         Daily HQ
         <span>Ryan Ball Photography</span>
       </div>
-      <div class="ns">Focus</div>
-      <div class="ni active" data-view="today"><i class="ti ti-layout-dashboard"></i> Today</div>
-      <div class="ni" data-view="chat"><i class="ti ti-message-circle"></i> PA Chat</div>
-      <div class="ni" data-view="inbox"><i class="ti ti-inbox"></i> Inbox <span class="nb" id="inbox-badge" style="display:none"></span></div>
+
+      <div class="ni active" data-view="inbox"><i class="ti ti-inbox"></i> Inbox <span class="nb" id="inbox-badge" style="display:none"></span></div>
+
+      <div class="ns">Plan</div>
+      <div class="ni" data-view="today"><i class="ti ti-layout-dashboard"></i> Today</div>
+      <div class="ni" data-view="weekly"><i class="ti ti-layout-columns"></i> Weekly</div>
+      <div class="ni" data-view="scheduled"><i class="ti ti-list-details"></i> Scheduled</div>
+      <div class="ni" data-view="calendar"><i class="ti ti-calendar"></i> Calendar</div>
+
       <div class="ns">Tasks</div>
       <div class="ni" data-view="all"><i class="ti ti-list-check"></i> All Tasks <span class="nb" id="task-badge"></span></div>
       <div class="ni" data-view="completed"><i class="ti ti-circle-check"></i> Completed</div>
-      <div class="ni" data-view="scheduled"><i class="ti ti-list-details"></i> Scheduled</div>
-      <div class="ni" data-view="weekly"><i class="ti ti-layout-columns"></i> Weekly</div>
-      <div class="ni" data-view="calendar"><i class="ti ti-calendar"></i> Calendar</div>
+
+      <div class="ns">Conversations</div>
+      <div class="ni" data-view="conversations"><i class="ti ti-messages"></i> Chat History</div>
+
       <div class="ns">Apps</div>
       <div class="ni ext" data-url="https://shoot-planner.ryanballphotography.com" data-label="Shoot Planner"><i class="ti ti-camera"></i> Shoot Planner</div>
       <div class="ni ext" data-url="https://the-darkroom-production.up.railway.app" data-label="The Darkroom"><i class="ti ti-moon"></i> The Darkroom</div>
       <div class="ni ext" data-url="https://app.freeagent.com" data-label="FreeAgent"><i class="ti ti-receipt"></i> FreeAgent</div>
-      <div class="ni ext" data-url="https://calendar.google.com" data-label="Google Calendar"><i class="ti ti-calendar"></i> Calendar</div>
     </div>
 
     <div class="main">
       <div class="topbar">
-        <span class="topbar-title" id="topbar-title">Today</span>
+        <span class="topbar-title" id="topbar-title">Inbox</span>
         <span class="topbar-date" id="topbar-date"></span>
         <button class="btn-add" id="btn-add-task"><i class="ti ti-plus"></i> Add task</button>
       </div>
 
+      <!-- Inbox view -->
+      <div class="view" id="view-inbox">
+        <div id="inbox-calendar-strip"></div>
+        <div id="inbox-proposals"></div>
+        <div id="inbox-generate" style="margin-top:1.5rem;padding-top:1.5rem;border-top:0.5px solid var(--border);">
+          <button id="btn-generate-day" onclick="generateDay()" style="font-size:13px;padding:10px 24px;border:none;border-radius:var(--radius);background:var(--text);color:white;cursor:pointer;display:flex;align-items:center;gap:8px;"><i class="ti ti-brain"></i> Generate my day</button>
+        </div>
+      </div>
+
       <!-- Today view -->
-      <div class="view" id="view-today">
+      <div class="view hidden" id="view-today">
         <div class="pa-note" id="pa-note">
           <div class="pa-note-label"><i class="ti ti-brain"></i> PA</div>
-          <div class="pa-note-text" id="pa-note-text">Loading your briefing...</div>
+          <div class="pa-note-text" id="pa-note-text">Press "Generate my day" in Inbox to load your briefing.</div>
         </div>
         <div id="today-tasks"></div>
         <div id="sp-panel"></div>
       </div>
+
+      <!-- Weekly view -->
+      <div class="view hidden" id="view-weekly">
+        <div class="pa-note" style="margin-bottom:1.25rem;">
+          <div class="pa-note-label"><i class="ti ti-brain"></i> PA — Weekly Plan</div>
+          <div class="pa-note-text" id="weekly-pa-note">Click Weekly to generate your plan.</div>
+        </div>
+        <div id="weekly-tasks"></div>
+      </div>
+
+      <!-- Scheduled view -->
+      <div class="view hidden" id="view-scheduled">
+        <div id="scheduled-tasks"></div>
+      </div>
+
+      <!-- Calendar view -->
+      <div class="view hidden" id="view-calendar" style="padding:0;height:calc(100vh - 49px);"></div>
 
       <!-- All tasks view -->
       <div class="view hidden" id="view-all">
@@ -59,44 +90,37 @@
         <div id="completed-tasks"></div>
       </div>
 
-      <!-- Chat view -->
-      <div class="view hidden" id="view-chat">
-        <div class="chat-wrap">
-          <div class="chat-msgs" id="chat-msgs">
-            <div class="msg msg-pa">
-              <div class="msg-label">PA</div>
-              <div class="msg-bubble">Hi Ryan. What's on your mind?</div>
-            </div>
-          </div>
-          <div class="chat-input-row">
-            <input type="text" id="chat-input" placeholder="Ask your PA anything..." />
-            <button class="send-btn" id="chat-send"><i class="ti ti-send"></i></button>
-          </div>
+      <!-- Conversations view -->
+      <div class="view hidden" id="view-conversations">
+        <div class="conv-search">
+          <input type="text" id="conv-search-input" placeholder="Search conversations..." oninput="searchConversations(this.value)" />
         </div>
+        <div id="conv-list"></div>
       </div>
 
-      <!-- Inbox view -->
-      <div class="view hidden" id="view-inbox">
-        <div id="inbox-proposals"></div>
+    </div>
+  </div>
+
+  <!-- Floating chat button -->
+  <button class="chat-fab" id="chat-fab" onclick="toggleChat()" title="PA Chat">
+    <i class="ti ti-message-circle"></i>
+  </button>
+
+  <!-- Chat panel -->
+  <div class="chat-panel hidden" id="chat-panel">
+    <div class="chat-panel-header">
+      <span>PA Chat</span>
+      <button onclick="toggleChat()" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:18px;"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="chat-msgs" id="chat-msgs">
+      <div class="msg msg-pa">
+        <div class="msg-label">PA</div>
+        <div class="msg-bubble">Hi Ryan. What's on your mind?</div>
       </div>
-
-      <!-- Scheduled view -->
-      <div class="view hidden" id="view-scheduled">
-        <div id="scheduled-tasks"></div>
-      </div>
-
-      <!-- Weekly view -->
-      <div class="view hidden" id="view-weekly">
-        <div class="pa-note" style="margin-bottom:1.25rem;">
-          <div class="pa-note-label"><i class="ti ti-brain"></i> PA — Weekly Plan</div>
-          <div class="pa-note-text" id="weekly-pa-note">Loading your weekly plan...</div>
-        </div>
-        <div id="weekly-tasks"></div>
-      </div>
-
-      <!-- Calendar view — MUST be inside .main -->
-      <div class="view hidden" id="view-calendar" style="padding:0;height:calc(100vh - 49px);"></div>
-
+    </div>
+    <div class="chat-input-row">
+      <input type="text" id="chat-input" placeholder="Ask your PA anything..." />
+      <button class="send-btn" id="chat-send"><i class="ti ti-send"></i></button>
     </div>
   </div>
 
@@ -148,7 +172,7 @@
       </div>
       <div class="modal-field">
         <label>Tag</label>
-        <input type="text" id="m-tag" placeholder="e.g. Lidl, Nando's, Admin" />
+        <input type="text" id="m-tag" placeholder="e.g. Lidl, Admin" />
       </div>
       <div class="modal-actions">
         <button class="btn-cancel" id="modal-cancel">Cancel</button>

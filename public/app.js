@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
   bindNav();
   bindModal();
   bindChat();
+  showInboxPrompt();
+  loadInboxCalendar();
 });
 
 function setDate() {
@@ -29,9 +31,10 @@ function bindNav() {
       if (view === 'all') renderAll();
       if (view === 'completed') renderCompleted();
       if (view === 'calendar') showCalendarView();
-      if (view === 'inbox') showInboxPrompt();
+      if (view === 'inbox') { showInboxPrompt(); loadInboxCalendar(); }
       if (view === 'scheduled') renderScheduled();
       if (view === 'weekly') renderWeekly();
+      if (view === 'conversations') renderConversations();
     });
   });
   document.querySelectorAll('.ni.ext').forEach(el => {
@@ -123,17 +126,49 @@ function taskHTML(t) {
     </div>`;
 }
 
+function sortTasks(list) {
+  return list.sort((a, b) => {
+    const aOver = isOverdue(a.due_date);
+    const bOver = isOverdue(b.due_date);
+    const aToday = isDueToday(a.due_date);
+    const bToday = isDueToday(b.due_date);
+    const pOrder = { p1: 1, p2: 2, p3: 3 };
+    // Overdue first
+    if (aOver && !bOver) return -1;
+    if (!aOver && bOver) return 1;
+    // Then by date
+    if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+    if (a.due_date && !b.due_date) return -1;
+    if (!a.due_date && b.due_date) return 1;
+    // Then by priority
+    return (pOrder[a.priority] || 3) - (pOrder[b.priority] || 3);
+  });
+}
+
 function renderToday() {
   const el = document.getElementById('today-tasks');
-  const overdue = tasks.filter(t => isOverdue(t.due_date));
-  const dueToday = tasks.filter(t => isDueToday(t.due_date));
-  const p1 = tasks.filter(t => !isOverdue(t.due_date) && !isDueToday(t.due_date) && t.priority === 'p1');
-  const rest = tasks.filter(t => !isOverdue(t.due_date) && !isDueToday(t.due_date) && t.priority !== 'p1').slice(0, 5);
+  const sorted = sortTasks([...tasks]);
+  const overdue = sorted.filter(t => isOverdue(t.due_date));
+  const dueToday = sorted.filter(t => isDueToday(t.due_date));
+  const p1NoDue = sorted.filter(t => !t.due_date && t.priority === 'p1');
+  const thisWeek = sorted.filter(t => {
+    if (!t.due_date || isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
+    const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7);
+    return new Date(t.due_date) <= weekEnd;
+  });
+  const upNext = sorted.filter(t => {
+    if (isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
+    if (!t.due_date && t.priority === 'p1') return false;
+    const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7);
+    if (t.due_date && new Date(t.due_date) <= weekEnd) return false;
+    return true;
+  }).slice(0, 3);
   let html = '';
   if (overdue.length) html += '<div class="section-lbl">Overdue</div>' + overdue.map(taskHTML).join('');
   if (dueToday.length) html += '<div class="section-lbl">Due today</div>' + dueToday.map(taskHTML).join('');
-  if (p1.length) html += '<div class="section-lbl">High priority</div>' + p1.map(taskHTML).join('');
-  if (rest.length) html += '<div class="section-lbl">Up next</div>' + rest.map(taskHTML).join('');
+  if (p1NoDue.length) html += '<div class="section-lbl">High priority</div>' + p1NoDue.map(taskHTML).join('');
+  if (thisWeek.length) html += '<div class="section-lbl">This week</div>' + thisWeek.map(taskHTML).join('');
+  if (upNext.length) html += '<div class="section-lbl">Up next</div>' + upNext.map(taskHTML).join('');
   if (!html) html = '<div class="empty">Nothing on your plate. Add a task or enjoy the quiet.</div>';
   el.innerHTML = html;
 }
@@ -967,6 +1002,130 @@ async function generateWeeklyPlan(spData, calEvents) {
   } catch(e) {
     el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Weekly plan unavailable.</div>';
   }
+}
+
+
+// ── Chat toggle ───────────────────────────────────────────────────────────────
+function toggleChat() {
+  const panel = document.getElementById('chat-panel');
+  panel.classList.toggle('hidden');
+  if (!panel.classList.contains('hidden')) {
+    setTimeout(() => document.getElementById('chat-input').focus(), 100);
+  }
+}
+
+// ── Generate day ──────────────────────────────────────────────────────────────
+async function generateDay() {
+  const btn = document.getElementById('btn-generate-day');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="ti ti-loader"></i> Generating...';
+  try {
+    await loadShootPlanner();
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="ti ti-brain"></i> Generate my day';
+  }
+  // Switch to Today view
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  document.querySelector('[data-view="today"]').classList.add('active');
+  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+  document.getElementById('view-today').classList.remove('hidden');
+  document.getElementById('topbar-title').textContent = 'Today';
+  renderToday();
+}
+
+// ── Inbox calendar strip ──────────────────────────────────────────────────────
+async function loadInboxCalendar() {
+  const el = document.getElementById('inbox-calendar-strip');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/calendar');
+    const data = await res.json();
+    const events = data.events || [];
+    const days = [];
+    for (let i = 0; i < 3; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() + i);
+      days.push(d);
+    }
+    let html = '<div class="inbox-cal-strip">';
+    days.forEach(d => {
+      const ds = d.toISOString().split('T')[0];
+      const isToday = ds === today;
+      const label = isToday ? 'Today' : d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
+      const dayEvents = events.filter(e => e.start.split('T')[0] === ds);
+      html += '<div class="inbox-cal-day' + (isToday ? ' today' : '') + '">';
+      html += '<div class="inbox-cal-day-label">' + label + '</div>';
+      if (dayEvents.length) {
+        dayEvents.forEach(e => {
+          const time = e.allDay ? '' : ' ' + new Date(e.start).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+          html += '<div class="inbox-cal-event">' + e.title + time + '</div>';
+        });
+      } else {
+        html += '<div class="inbox-cal-empty">Clear</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) {
+    console.log('Calendar strip unavailable');
+  }
+}
+
+// ── Conversations ─────────────────────────────────────────────────────────────
+let savedConversations = JSON.parse(localStorage.getItem('pa_conversations') || '[]');
+
+function saveConversation() {
+  if (!chatHistory.length) return;
+  const conv = {
+    id: Date.now(),
+    date: new Date().toISOString(),
+    preview: chatHistory[0].content.slice(0, 80),
+    messages: [...chatHistory]
+  };
+  savedConversations.unshift(conv);
+  if (savedConversations.length > 50) savedConversations = savedConversations.slice(0, 50);
+  localStorage.setItem('pa_conversations', JSON.stringify(savedConversations));
+}
+
+function renderConversations(filter = '') {
+  const el = document.getElementById('conv-list');
+  if (!el) return;
+  const filtered = savedConversations.filter(c => 
+    c.preview.toLowerCase().includes(filter.toLowerCase()) ||
+    c.messages.some(m => m.content.toLowerCase().includes(filter.toLowerCase()))
+  );
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty">No saved conversations yet.</div>';
+    return;
+  }
+  el.innerHTML = filtered.map(c => {
+    const d = new Date(c.date);
+    const label = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'short' }) + ' at ' + d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+    return '<div class="conv-item" onclick="loadConversation(' + c.id + ')">' +
+      '<div class="conv-item-date">' + label + '</div>' +
+      '<div class="conv-item-preview">' + c.preview + '...</div>' +
+      '</div>';
+  }).join('');
+}
+
+function searchConversations(val) {
+  renderConversations(val);
+}
+
+function loadConversation(id) {
+  const conv = savedConversations.find(c => c.id === id);
+  if (!conv) return;
+  chatHistory = [...conv.messages];
+  const msgs = document.getElementById('chat-msgs');
+  msgs.innerHTML = conv.messages.map(m => {
+    const who = m.role === 'user' ? 'me' : 'pa';
+    const label = m.role === 'user' ? 'Ryan' : 'PA';
+    return '<div class="msg msg-' + who + '"><div class="msg-label">' + label + '</div><div class="msg-bubble">' + m.content + '</div></div>';
+  }).join('');
+  msgs.scrollTop = msgs.scrollHeight;
+  toggleChat();
 }
 
 function showCalendarView() {
