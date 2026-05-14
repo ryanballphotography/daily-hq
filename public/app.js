@@ -472,9 +472,20 @@ function acceptProposal(i) {
   setTimeout(() => document.getElementById('m-title').focus(), 50);
 }
 
-function skipProposal(i) {
-  const el = document.getElementById('proposal-' + i);
-  if (el) el.remove();
+async function skipProposal(i) {
+  const el = document.getElementById('inbox-proposals');
+  const p = el && el._proposals ? el._proposals[i] : null;
+  if (p && p.threadId) {
+    try {
+      await fetch('/api/gmail-skip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: p.threadId })
+      });
+    } catch(e) { console.log('Skip save failed', e); }
+  }
+  const card = document.getElementById('proposal-' + i);
+  if (card) card.remove();
   const remaining = document.querySelectorAll('[id^="proposal-"]').length;
   const badge = document.getElementById('inbox-badge');
   if (badge) { badge.textContent = remaining; if (!remaining) badge.style.display = 'none'; }

@@ -197,6 +197,19 @@ app.get("/api/gmail-summary", async (req, res) => {
   } catch(err) { res.status(500).json({error: err.message}); }
 });
 
+
+app.post("/api/gmail-skip", async (req, res) => {
+  try {
+    const response = await fetch("https://shoot-planner.ryanballphotography.com/api/gmail-skip", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": process.env.DAILY_HQ_SECRET },
+      body: JSON.stringify(req.body)
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
 const PORT = process.env.PORT || 3000;
 initDB().then(() => app.listen(PORT, () => console.log(`Daily HQ running on ${PORT}`)));
 // temp debug
