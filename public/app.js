@@ -841,6 +841,9 @@ async function generateDay() {
   btn.disabled = true;
   btn.innerHTML = '<i class="ti ti-loader"></i> Generating...';
   try {
+    // Force fresh calendar and shoot planner data
+    const events = await loadCalendarEvents();
+    window._calEvents = events;
     await loadShootPlanner();
   } finally {
     btn.disabled = false;
