@@ -250,12 +250,16 @@ async function loadShootPlanner() {
   try {
     const res = await fetch('/api/shoot-planner');
     const data = await res.json();
+    window._spData = data;
     renderShootPlannerPanel(data);
     const events = await loadCalendarEvents();
+    window._calEvents = events;
     generateBriefingWithContext(data, events);
     return data;
   } catch(e) {
     console.log('Shoot Planner unavailable', e);
+    window._spData = null;
+    window._calEvents = [];
     generateBriefingWithContext(null, []);
     return null;
   }
@@ -329,7 +333,11 @@ async function generateBriefingWithContext(spData, calEvents) {
     if (stale.length) shootContext += 'STALE QUOTES (unsent 2+ days): ' + stale.map(q => q.name + ' for ' + q.clientName).join(', ') + '. ';
   }
 
-  const context = 'Today is ' + new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + '. ' + shootContext + 'Ryan has ' + tasks.length + ' open tasks. ' + (overdue > 0 ? overdue + ' are overdue. ' : '') + (dueToday > 0 ? dueToday + ' due today. ' : '') + 'Tasks: ' + taskList;
+  const days = getWeekDays();
+  const weekEnd = days[6].toISOString().split('T')[0];
+  const weekTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] <= weekEnd && !isOverdue(t.due_date) && !isDueToday(t.due_date));
+  const weekTaskList = weekTasks.map(t => '"' + t.title + '" (due ' + formatDate(t.due_date) + ', ' + t.priority + ')').join('; ');
+  const context = 'Today is ' + new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }) + '. ' + shootContext + 'Ryan has ' + tasks.length + ' open tasks. ' + (overdue > 0 ? overdue + ' are overdue. ' : '') + (dueToday > 0 ? dueToday + ' due today. ' : '') + 'Tasks due today: ' + taskList + (weekTaskList ? '. Tasks later this week: ' + weekTaskList : '') + '.'
 
   try {
     const res = await fetch('/api/pa/briefing', {
@@ -525,7 +533,18 @@ function renderScheduled() {
 
 function renderWeekly() {
   const el = document.getElementById('weekly-tasks');
+  generateWeeklyPlan(window._spData || null, window._calEvents || []);
   if (!el) return;
+  // Load weekly PA plan
+  if (window._spData !== undefined || window._calEvents !== undefined) {
+    generateWeeklyPlan(window._spData || null, window._calEvents || []);
+  } else {
+    loadShootPlanner().then(spData => {
+      loadCalendarEvents().then(calEvents => {
+        generateWeeklyPlan(spData, calEvents);
+      });
+    });
+  }
   const days = getWeekDays();
   let html = '<div class="week-grid">';
   days.forEach(d => {
@@ -561,6 +580,366 @@ function renderWeekly() {
     html += undated.map(taskHTML).join('');
   }
   el.innerHTML = html;
+}
+
+
+async function generateWeeklyPlan(spData, calEvents) {
+  const el = document.getElementById('weekly-pa-note');
+  if (!el) return;
+  el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Analysing your week...</div>';
+
+  // Build full week context
+  const days = getWeekDays();
+  const weekEnd = days[6].toISOString().split('T')[0];
+
+  // Tasks this week
+  const weekTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] <= weekEnd);
+  const overdueTasks = tasks.filter(t => isOverdue(t.due_date));
+  const undatedTasks = tasks.filter(t => !t.due_date);
+
+  const tasksByDay = {};
+  days.forEach(d => {
+    const ds = d.toISOString().split('T')[0];
+    tasksByDay[ds] = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === ds);
+  });
+
+  // Build context string
+  let context = 'Today is ' + new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + '.\n\n';
+
+  // Shoots this fortnight
+  if (spData && spData.shoots && spData.shoots.length) {
+    context += 'SHOOTS:\n' + spData.shoots.map(s => '- ' + s.name + ' on ' + s.startDate).join('\n') + '\n\n';
+  }
+
+  // Stale quotes
+  if (spData && spData.quotes && spData.quotes.length) {
+    const stale = spData.quotes.filter(q => Math.floor((new Date() - new Date(q.createdAt)) / 86400000) >= 2);
+    if (stale.length) context += 'STALE QUOTES: ' + stale.map(q => q.name + ' for ' + q.clientName).join(', ') + '\n\n';
+  }
+
+  // Calendar events this week
+  if (calEvents && calEvents.length) {
+    const weekCal = calEvents.filter(e => e.start.split('T')[0] <= weekEnd);
+    if (weekCal.length) {
+      context += 'CALENDAR THIS WEEK:\n' + weekCal.map(e => {
+        const d = new Date(e.start.split('T')[0] + 'T00:00:00');
+        return '- ' + d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'}) + ': ' + e.title;
+      }).join('\n') + '\n\n';
+    }
+  }
+
+  // Tasks by day
+  context += 'TASKS BY DAY THIS WEEK:\n';
+  days.forEach(d => {
+    const ds = d.toISOString().split('T')[0];
+    const dayLabel = d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'});
+    const dayTasks = tasksByDay[ds];
+    if (dayTasks.length) {
+      context += dayLabel + ': ' + dayTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
+    } else {
+      context += dayLabel + ': nothing scheduled\n';
+    }
+  });
+
+  if (overdueTasks.length) {
+    context += '\nOVERDUE: ' + overdueTasks.map(t => t.title).join(', ') + '\n';
+  }
+  if (undatedTasks.length) {
+    context += '\nUNSCHEDULED TASKS (need placing in week): ' + undatedTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
+  }
+
+  try {
+    const res = await fetch('/api/pa/briefing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week. Be direct and opinionated - tell him specifically when to do things. Consider shoot days as blocked. Highlight overloaded or light days. Format: one punchy sentence about the week shape, then day-by-day with day name in caps and bullet points using the bullet character. End with a Watch out line if anything is at risk. Keep bullets to one line.",
+        messages: [{ role: 'user', content: context + '\n\nGive me my weekly plan.' }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content[0].text;
+    el.innerHTML = raw.split('\n').map(line => {
+      if (!line.trim()) return '<div style="height:8px;"></div>';
+      if (line.startsWith('•')) return '<div style="display:flex;gap:8px;margin-top:3px;"><span style="flex-shrink:0;">•</span><span>' + line.slice(1).trim() + '</span></div>';
+      if (line.match(/^[A-Z]{3,}/) ) return '<div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--text3);margin-top:14px;margin-bottom:2px;text-transform:uppercase;">' + line + '</div>';
+      return '<div style="font-weight:500;margin-bottom:4px;">' + line + '</div>';
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Weekly plan unavailable.</div>';
+  }
+}
+
+
+async function generateWeeklyPlan(spData, calEvents) {
+  const el = document.getElementById('weekly-pa-note');
+  if (!el) return;
+  el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Analysing your week...</div>';
+
+  // Build full week context
+  const days = getWeekDays();
+  const weekEnd = days[6].toISOString().split('T')[0];
+
+  // Tasks this week
+  const weekTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] <= weekEnd);
+  const overdueTasks = tasks.filter(t => isOverdue(t.due_date));
+  const undatedTasks = tasks.filter(t => !t.due_date);
+
+  const tasksByDay = {};
+  days.forEach(d => {
+    const ds = d.toISOString().split('T')[0];
+    tasksByDay[ds] = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === ds);
+  });
+
+  // Build context string
+  let context = 'Today is ' + new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + '.\n\n';
+
+  // Shoots this fortnight
+  if (spData && spData.shoots && spData.shoots.length) {
+    context += 'SHOOTS:\n' + spData.shoots.map(s => '- ' + s.name + ' on ' + s.startDate).join('\n') + '\n\n';
+  }
+
+  // Stale quotes
+  if (spData && spData.quotes && spData.quotes.length) {
+    const stale = spData.quotes.filter(q => Math.floor((new Date() - new Date(q.createdAt)) / 86400000) >= 2);
+    if (stale.length) context += 'STALE QUOTES: ' + stale.map(q => q.name + ' for ' + q.clientName).join(', ') + '\n\n';
+  }
+
+  // Calendar events this week
+  if (calEvents && calEvents.length) {
+    const weekCal = calEvents.filter(e => e.start.split('T')[0] <= weekEnd);
+    if (weekCal.length) {
+      context += 'CALENDAR THIS WEEK:\n' + weekCal.map(e => {
+        const d = new Date(e.start.split('T')[0] + 'T00:00:00');
+        return '- ' + d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'}) + ': ' + e.title;
+      }).join('\n') + '\n\n';
+    }
+  }
+
+  // Tasks by day
+  context += 'TASKS BY DAY THIS WEEK:\n';
+  days.forEach(d => {
+    const ds = d.toISOString().split('T')[0];
+    const dayLabel = d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'});
+    const dayTasks = tasksByDay[ds];
+    if (dayTasks.length) {
+      context += dayLabel + ': ' + dayTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
+    } else {
+      context += dayLabel + ': nothing scheduled\n';
+    }
+  });
+
+  if (overdueTasks.length) {
+    context += '\nOVERDUE: ' + overdueTasks.map(t => t.title).join(', ') + '\n';
+  }
+  if (undatedTasks.length) {
+    context += '\nUNSCHEDULED TASKS (need placing in week): ' + undatedTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
+  }
+
+  try {
+    const res = await fetch('/api/pa/briefing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week. Be direct and opinionated - tell him specifically when to do things. Consider shoot days as blocked. Highlight overloaded or light days. Format: one punchy sentence about the week shape, then day-by-day with day name in caps and bullet points using the bullet character. End with a Watch out line if anything is at risk. Keep bullets to one line.",
+        messages: [{ role: 'user', content: context + '\n\nGive me my weekly plan.' }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content[0].text;
+    el.innerHTML = raw.split('\n').map(line => {
+      if (!line.trim()) return '<div style="height:8px;"></div>';
+      if (line.startsWith('•')) return '<div style="display:flex;gap:8px;margin-top:3px;"><span style="flex-shrink:0;">•</span><span>' + line.slice(1).trim() + '</span></div>';
+      if (line.match(/^[A-Z]{3,}/) ) return '<div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--text3);margin-top:14px;margin-bottom:2px;text-transform:uppercase;">' + line + '</div>';
+      return '<div style="font-weight:500;margin-bottom:4px;">' + line + '</div>';
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Weekly plan unavailable.</div>';
+  }
+}
+
+
+async function generateWeeklyPlan(spData, calEvents) {
+  const el = document.getElementById('weekly-pa-note');
+  if (!el) return;
+  el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Analysing your week...</div>';
+
+  // Build full week context
+  const days = getWeekDays();
+  const weekEnd = days[6].toISOString().split('T')[0];
+
+  // Tasks this week
+  const weekTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] <= weekEnd);
+  const overdueTasks = tasks.filter(t => isOverdue(t.due_date));
+  const undatedTasks = tasks.filter(t => !t.due_date);
+
+  const tasksByDay = {};
+  days.forEach(d => {
+    const ds = d.toISOString().split('T')[0];
+    tasksByDay[ds] = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === ds);
+  });
+
+  // Build context string
+  let context = 'Today is ' + new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + '.\n\n';
+
+  // Shoots this fortnight
+  if (spData && spData.shoots && spData.shoots.length) {
+    context += 'SHOOTS:\n' + spData.shoots.map(s => '- ' + s.name + ' on ' + s.startDate).join('\n') + '\n\n';
+  }
+
+  // Stale quotes
+  if (spData && spData.quotes && spData.quotes.length) {
+    const stale = spData.quotes.filter(q => Math.floor((new Date() - new Date(q.createdAt)) / 86400000) >= 2);
+    if (stale.length) context += 'STALE QUOTES: ' + stale.map(q => q.name + ' for ' + q.clientName).join(', ') + '\n\n';
+  }
+
+  // Calendar events this week
+  if (calEvents && calEvents.length) {
+    const weekCal = calEvents.filter(e => e.start.split('T')[0] <= weekEnd);
+    if (weekCal.length) {
+      context += 'CALENDAR THIS WEEK:\n' + weekCal.map(e => {
+        const d = new Date(e.start.split('T')[0] + 'T00:00:00');
+        return '- ' + d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'}) + ': ' + e.title;
+      }).join('\n') + '\n\n';
+    }
+  }
+
+  // Tasks by day
+  context += 'TASKS BY DAY THIS WEEK:\n';
+  days.forEach(d => {
+    const ds = d.toISOString().split('T')[0];
+    const dayLabel = d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'});
+    const dayTasks = tasksByDay[ds];
+    if (dayTasks.length) {
+      context += dayLabel + ': ' + dayTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
+    } else {
+      context += dayLabel + ': nothing scheduled\n';
+    }
+  });
+
+  if (overdueTasks.length) {
+    context += '\nOVERDUE: ' + overdueTasks.map(t => t.title).join(', ') + '\n';
+  }
+  if (undatedTasks.length) {
+    context += '\nUNSCHEDULED TASKS (need placing in week): ' + undatedTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
+  }
+
+  try {
+    const res = await fetch('/api/pa/briefing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week. Be direct and opinionated - tell him specifically when to do things. Consider shoot days as blocked. Highlight overloaded or light days. Format: one punchy sentence about the week shape, then day-by-day with day name in caps and bullet points using the bullet character. End with a Watch out line if anything is at risk. Keep bullets to one line.",
+        messages: [{ role: 'user', content: context + '\n\nGive me my weekly plan.' }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content[0].text;
+    el.innerHTML = raw.split('\n').map(line => {
+      if (!line.trim()) return '<div style="height:8px;"></div>';
+      if (line.startsWith('•')) return '<div style="display:flex;gap:8px;margin-top:3px;"><span style="flex-shrink:0;">•</span><span>' + line.slice(1).trim() + '</span></div>';
+      if (line.match(/^[A-Z]{3,}/) ) return '<div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--text3);margin-top:14px;margin-bottom:2px;text-transform:uppercase;">' + line + '</div>';
+      return '<div style="font-weight:500;margin-bottom:4px;">' + line + '</div>';
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Weekly plan unavailable.</div>';
+  }
+}
+
+
+async function generateWeeklyPlan(spData, calEvents) {
+  const el = document.getElementById('weekly-pa-note');
+  if (!el) return;
+  el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Analysing your week...</div>';
+
+  // Build full week context
+  const days = getWeekDays();
+  const weekEnd = days[6].toISOString().split('T')[0];
+
+  // Tasks this week
+  const weekTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] <= weekEnd);
+  const overdueTasks = tasks.filter(t => isOverdue(t.due_date));
+  const undatedTasks = tasks.filter(t => !t.due_date);
+
+  const tasksByDay = {};
+  days.forEach(d => {
+    const ds = d.toISOString().split('T')[0];
+    tasksByDay[ds] = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === ds);
+  });
+
+  // Build context string
+  let context = 'Today is ' + new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + '.\n\n';
+
+  // Shoots this fortnight
+  if (spData && spData.shoots && spData.shoots.length) {
+    context += 'SHOOTS:\n' + spData.shoots.map(s => '- ' + s.name + ' on ' + s.startDate).join('\n') + '\n\n';
+  }
+
+  // Stale quotes
+  if (spData && spData.quotes && spData.quotes.length) {
+    const stale = spData.quotes.filter(q => Math.floor((new Date() - new Date(q.createdAt)) / 86400000) >= 2);
+    if (stale.length) context += 'STALE QUOTES: ' + stale.map(q => q.name + ' for ' + q.clientName).join(', ') + '\n\n';
+  }
+
+  // Calendar events this week
+  if (calEvents && calEvents.length) {
+    const weekCal = calEvents.filter(e => e.start.split('T')[0] <= weekEnd);
+    if (weekCal.length) {
+      context += 'CALENDAR THIS WEEK:\n' + weekCal.map(e => {
+        const d = new Date(e.start.split('T')[0] + 'T00:00:00');
+        return '- ' + d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'}) + ': ' + e.title;
+      }).join('\n') + '\n\n';
+    }
+  }
+
+  // Tasks by day
+  context += 'TASKS BY DAY THIS WEEK:\n';
+  days.forEach(d => {
+    const ds = d.toISOString().split('T')[0];
+    const dayLabel = d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'});
+    const dayTasks = tasksByDay[ds];
+    if (dayTasks.length) {
+      context += dayLabel + ': ' + dayTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
+    } else {
+      context += dayLabel + ': nothing scheduled\n';
+    }
+  });
+
+  if (overdueTasks.length) {
+    context += '\nOVERDUE: ' + overdueTasks.map(t => t.title).join(', ') + '\n';
+  }
+  if (undatedTasks.length) {
+    context += '\nUNSCHEDULED TASKS (need placing in week): ' + undatedTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
+  }
+
+  try {
+    const res = await fetch('/api/pa/briefing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week. Be direct and opinionated - tell him specifically when to do things. Consider shoot days as blocked. Highlight overloaded or light days. Format: one punchy sentence about the week shape, then day-by-day with day name in caps and bullet points using the bullet character. End with a Watch out line if anything is at risk. Keep bullets to one line.",
+        messages: [{ role: 'user', content: context + '\n\nGive me my weekly plan.' }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content[0].text;
+    el.innerHTML = raw.split('\n').map(line => {
+      if (!line.trim()) return '<div style="height:8px;"></div>';
+      if (line.startsWith('•')) return '<div style="display:flex;gap:8px;margin-top:3px;"><span style="flex-shrink:0;">•</span><span>' + line.slice(1).trim() + '</span></div>';
+      if (line.match(/^[A-Z]{3,}/) ) return '<div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--text3);margin-top:14px;margin-bottom:2px;text-transform:uppercase;">' + line + '</div>';
+      return '<div style="font-weight:500;margin-bottom:4px;">' + line + '</div>';
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Weekly plan unavailable.</div>';
+  }
 }
 
 function showCalendarView() {
