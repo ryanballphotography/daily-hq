@@ -603,6 +603,7 @@ function renderWeekly() {
   if (!el) return;
   renderWeeklyGrid();
   generateWeeklyPlan(window._spData || null, window._calEvents || []);
+  return;
   const days = getWeekDays();
 
   let html = '<div class="week-grid-blocks">';
@@ -758,6 +759,8 @@ async function generateWeeklyPlan(spData, calEvents) {
   } catch(e) {
     console.log('Weekly plan error', e);
     window._weeklyDaySummaries = {};
+    window._weekSummary = '';
+    window._weekWatchOut = '';
   }
 
   // Re-render the grid now we have summaries
