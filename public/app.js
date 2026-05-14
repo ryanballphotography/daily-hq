@@ -860,6 +860,15 @@ function toggleChat() {
 }
 
 // ── Generate day ──────────────────────────────────────────────────────────────
+
+async function refreshBriefing() {
+  const el = document.getElementById('pa-note-text');
+  if (el) el.textContent = 'Refreshing...';
+  const events = await loadCalendarEvents();
+  window._calEvents = events;
+  await loadShootPlanner();
+}
+
 async function generateDay() {
   const btn = document.getElementById('btn-generate-day');
   btn.disabled = true;

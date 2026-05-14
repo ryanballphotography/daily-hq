@@ -48,15 +48,13 @@
       <div class="view" id="view-inbox">
         <div id="inbox-calendar-strip"></div>
         <div id="inbox-proposals"></div>
-        <div id="inbox-generate" style="margin-top:1.5rem;padding-top:1.5rem;border-top:0.5px solid var(--border);">
-          <button id="btn-generate-day" onclick="generateDay()" style="font-size:13px;padding:10px 24px;border:none;border-radius:var(--radius);background:var(--text);color:white;cursor:pointer;display:flex;align-items:center;gap:8px;"><i class="ti ti-brain"></i> Generate my day</button>
-        </div>
+
       </div>
 
       <!-- Today view -->
       <div class="view hidden" id="view-today">
         <div class="pa-note" id="pa-note">
-          <div class="pa-note-label"><i class="ti ti-brain"></i> PA</div>
+          <div class="pa-note-label"><i class="ti ti-brain"></i> PA <button onclick="refreshBriefing()" style="margin-left:8px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:0;" title="Refresh briefing"><i class="ti ti-refresh"></i></button></div>
           <div class="pa-note-text" id="pa-note-text">Press "Generate my day" in Inbox to load your briefing.</div>
         </div>
         <div id="today-tasks"></div>
