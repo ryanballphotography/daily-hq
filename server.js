@@ -31,6 +31,7 @@ async function initDB() {
   `);
   // Add time_block column if it doesn't exist (for existing DBs)
   await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time_block VARCHAR(20) DEFAULT NULL`);
+  await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
   console.log('DB ready');
 }
 
@@ -223,6 +224,32 @@ app.patch("/api/tasks/:id/timeblock", async (req, res) => {
     );
     res.json(result.rows[0]);
   } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+
+app.post("/api/tasks/reorder", async (req, res) => {
+  const { taskId, targetTaskId, date, block } = req.body;
+  try {
+    // Get all tasks in this block
+    const result = await pool.query(
+      'SELECT id, sort_order FROM tasks WHERE due_date::date = $1 AND time_block = $2 AND done = false ORDER BY sort_order ASC, id ASC',
+      [date, block]
+    );
+    let ids = result.rows.map(r => r.id);
+    // Move taskId to position of targetTaskId
+    ids = ids.filter(id => id !== taskId);
+    const targetIdx = ids.indexOf(targetTaskId);
+    if (targetIdx === -1) {
+      ids.push(taskId);
+    } else {
+      ids.splice(targetIdx, 0, taskId);
+    }
+    // Update sort_order for all
+    for (let i = 0; i < ids.length; i++) {
+      await pool.query('UPDATE tasks SET sort_order = $1 WHERE id = $2', [i, ids[i]]);
+    }
+    res.json({ success: true });
+  } catch(err) { res.status(500).json({ error: err.message }); }
 });
 
 const PORT = process.env.PORT || 3000;

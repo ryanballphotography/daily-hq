@@ -635,15 +635,39 @@ async function dropTask(event) {
   const block = cell.dataset.block;
   const task = tasks.find(t => t.id === draggedTaskId);
   if (!task) return;
-  await fetch('/api/tasks/' + draggedTaskId, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ due_date: date, time_block: block })
-  });
-  task.due_date = date;
-  task.time_block = block;
+
+  // Check if dropping onto another task for reordering
+  const targetTaskEl = event.target.closest('.wgb-task');
+  const targetTaskId = targetTaskEl ? parseInt(targetTaskEl.dataset.taskId) : null;
+
+  const sameBlock = task.due_date && task.due_date.split('T')[0] === date && task.time_block === block;
+
+  if (sameBlock && targetTaskId && targetTaskId !== draggedTaskId) {
+    // Reorder within block
+    await fetch('/api/tasks/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId: draggedTaskId, targetTaskId, date, block })
+    });
+    // Update local sort_order
+    const blockTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === date && t.time_block === block);
+    let ids = blockTasks.sort((a,b) => (a.sort_order||0) - (b.sort_order||0)).map(t => t.id);
+    ids = ids.filter(id => id !== draggedTaskId);
+    const targetIdx = ids.indexOf(targetTaskId);
+    if (targetIdx === -1) ids.push(draggedTaskId); else ids.splice(targetIdx, 0, draggedTaskId);
+    ids.forEach((id, i) => { const t = tasks.find(t => t.id === id); if (t) t.sort_order = i; });
+  } else {
+    // Move to new block
+    await fetch('/api/tasks/' + draggedTaskId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ due_date: date, time_block: block })
+    });
+    task.due_date = date;
+    task.time_block = block;
+  }
   draggedTaskId = null;
-  renderWeekly();
+  renderWeeklyGrid();
 }
 
 async function dropTaskUnscheduled(event) {
@@ -790,11 +814,11 @@ function renderWeeklyGrid() {
     days.forEach(d => {
       const dateStr = localDateStr(d);
       const isToday = dateStr === today;
-      const cellTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === dateStr && t.time_block === block.id);
+      const cellTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === dateStr && t.time_block === block.id).sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
       html += '<div class="wgb-cell' + (isToday ? ' wgb-cell-today' : '') + '" data-date="' + dateStr + '" data-block="' + block.id + '" ondragover="event.preventDefault()" ondrop="dropTask(event)">';
       cellTasks.forEach(t => {
         const cat = t.category || 'work';
-        html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
+        html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" data-task-id="' + t.id + '" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
         html += '<div class="wgb-task-title">' + t.title + '</div>';
         if (t.tag) html += '<div class="wgb-task-tag">' + t.tag + '</div>';
         html += '</div>';
