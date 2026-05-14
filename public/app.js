@@ -724,32 +724,54 @@ function renderWeeklyGrid() {
   const days = getWeekDays();
   const summaries = window._weeklyDaySummaries || {};
 
-  // Week summary bar
   let html = '';
+
   if (window._weekSummary) {
-    html += '<div style="font-size:13px;font-weight:500;margin-bottom:0.5rem;">' + window._weekSummary + '</div>';
+    html += '<div class="week-summary-bar">' + window._weekSummary + '</div>';
   }
   if (window._weekWatchOut) {
-    html += '<div style="font-size:12px;color:var(--p1);margin-bottom:1rem;">⚠ ' + window._weekWatchOut + '</div>';
+    html += '<div class="week-watchout">\u26a0 ' + window._weekWatchOut + '</div>';
   }
 
+  // Day summary cards
+  html += '<div class="week-day-cards">';
+  days.forEach(d => {
+    const dateStr = d.toISOString().split('T')[0];
+    const isToday = dateStr === today;
+    const summary = summaries[dateStr] || '';
+    const dayName = d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase();
+    const dayNum = d.getDate();
+    const monthName = d.toLocaleDateString('en-GB', { month: 'short' });
+    html += '<div class="week-day-card' + (isToday ? ' week-day-card-today' : '') + '">';
+    html += '<div class="wdc-date">';
+    html += '<span class="wdc-day">' + dayName + '</span>';
+    if (isToday) {
+      html += '<span class="wdc-num wdc-num-today">' + dayNum + '</span>';
+    } else {
+      html += '<span class="wdc-num">' + dayNum + '</span>';
+    }
+    html += '<span class="wdc-month">' + monthName + '</span>';
+    html += '</div>';
+    html += '<div class="wdc-summary">' + (summary || '<span style="color:var(--text3);font-style:italic;font-size:11px;">Loading...</span>') + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Schedule grid
+  html += '<div class="week-schedule-label">Schedule</div>';
   html += '<div class="week-grid-blocks">';
-  // Header row with day summaries
   html += '<div class="wgb-header-row">';
   html += '<div class="wgb-block-col"></div>';
   days.forEach(d => {
     const dateStr = d.toISOString().split('T')[0];
     const isToday = dateStr === today;
-    const summary = summaries[dateStr] || '';
     html += '<div class="wgb-day-header' + (isToday ? ' wgb-today' : '') + '">';
     html += '<div class="wgb-day-name">' + d.toLocaleDateString('en-GB', { weekday: 'short' }) + '</div>';
     html += '<div class="wgb-day-num' + (isToday ? ' wgb-day-num-today' : '') + '">' + d.getDate() + '</div>';
-    if (summary) html += '<div class="wgb-day-summary">' + summary + '</div>';
     html += '</div>';
   });
   html += '</div>';
 
-  // Block rows
   BLOCKS.forEach(block => {
     html += '<div class="wgb-row">';
     html += '<div class="wgb-block-col"><div class="wgb-block-label">' + block.label + '</div><div class="wgb-block-time">' + block.time + '</div></div>';
@@ -769,11 +791,11 @@ function renderWeeklyGrid() {
     });
     html += '</div>';
   });
+  html += '</div>';
 
-  // Unscheduled
   const unscheduled = tasks.filter(t => !t.due_date || !t.time_block);
   html += '<div class="wgb-unscheduled">';
-  html += '<div class="wgb-unscheduled-label">Unscheduled - drag to schedule</div>';
+  html += '<div class="wgb-unscheduled-label">Unscheduled \u2014 drag to schedule</div>';
   html += '<div class="wgb-unscheduled-tasks" ondragover="event.preventDefault()" ondrop="dropTaskUnscheduled(event)">';
   if (unscheduled.length) {
     unscheduled.forEach(t => {
@@ -786,9 +808,10 @@ function renderWeeklyGrid() {
   } else {
     html += '<div style="font-size:12px;color:var(--text3);">All tasks scheduled.</div>';
   }
-  html += '</div></div></div>';
+  html += '</div></div>';
   el.innerHTML = html;
 }
+
 
 
 // ── Chat toggle ───────────────────────────────────────────────────────────────
@@ -924,3 +947,4 @@ function showCalendarView() {
     c.appendChild(f);
   }
 }
+/* This line intentionally left blank */
