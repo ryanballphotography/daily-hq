@@ -391,13 +391,13 @@ async function generateBriefingWithContext(spData, calEvents) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
-        system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer based in London and Somerset running his own limited company with clients including Lidl, Nando\'s, Ocado, and Ardbeg. The current year is 2026. Give a short direct morning briefing. Be blunt, no softening. IMPORTANT: If UPCOMING SHOOTS lists a shoot as today, he is on a shoot day — lead with that. Format your response as: one short punchy sentence summarising the day, then 2-4 bullet points (use • ) each being one specific action or priority. Keep each bullet to one line. Pick the most important things only — never list everything.',
+        system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer based in London and Somerset running his own limited company with clients including Lidl, Nando\'s, Ocado, and Ardbeg. The current year is 2026. Give a short direct morning briefing. Be blunt, no softening. IMPORTANT rules: (1) If UPCOMING SHOOTS lists a shoot as today, lead with that. (2) Only surface tasks that are overdue or due today — do NOT mention tasks with future due dates unless they are within 48 hours. (3) Never mention bold markdown formatting — output plain text only. Format: one punchy sentence summarising the day, then 2-4 bullet points (use • ) each being one specific action. Keep each bullet to one line. Pick the most important things only.',
         messages: [{ role: 'user', content: 'Here is my context:\n' + context + '\n\nGive me my morning briefing.' }]
       })
     });
     const data = await res.json();
-    const raw = data.content[0].text;
-    el.innerHTML = raw.split('\n').map(line => line.startsWith('•') ? '<div style="display:flex;gap:8px;margin-top:4px;"><span>•</span><span>' + line.slice(1).trim() + '</span></div>' : '<div style="margin-bottom:6px;font-weight:500;">' + line + '</div>').join('');
+    const raw = data.content[0].text.replace(/\*\*(.+?)\*\*/g, '$1');
+    el.innerHTML = raw.split('\n').filter(l => l.trim()).map(line => line.startsWith('•') ? '<div style="display:flex;gap:8px;margin-top:4px;"><span>•</span><span>' + line.slice(1).trim() + '</span></div>' : '<div style="margin-bottom:6px;font-weight:500;">' + line + '</div>').join('');
   } catch (err) {
     el.textContent = shootContext || (tasks.length + ' tasks open.');
   }
