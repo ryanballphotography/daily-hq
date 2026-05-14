@@ -365,8 +365,15 @@ async function generateBriefingWithContext(spData, calEvents) {
 
   let shootContext = '';
   if (calEvents && calEvents.length) {
-    const todayCal = calEvents.filter(e => e.start.split('T')[0] === today);
-    if (todayCal.length) shootContext += 'CALENDAR TODAY: ' + todayCal.map(e => e.title + (e.allDay ? '' : ' at ' + new Date(e.start).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}))).join(', ') + '. ';
+    const now = new Date();
+    const todayCal = calEvents.filter(e => {
+      if (e.start.split('T')[0] !== today) return false;
+      if (e.allDay) return true;
+      // Only include if event hasn't ended yet
+      const eventEnd = e.end ? new Date(e.end) : new Date(new Date(e.start).getTime() + 3600000);
+      return eventEnd > now;
+    });
+    if (todayCal.length) shootContext += 'CALENDAR TODAY (upcoming only): ' + todayCal.map(e => e.title + (e.allDay ? '' : ' at ' + new Date(e.start).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}))).join(', ') + '. ';
   }
   if (spData && spData.shoots && spData.shoots.length) {
     const todayShoots = spData.shoots.filter(s => s.startDate === today);
