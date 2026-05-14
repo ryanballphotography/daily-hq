@@ -163,7 +163,12 @@ async function renderCompleted() {
 
 function bindModal() {
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
-  document.getElementById("modal-bg").addEventListener('click', e => { if (e.target.classList.contains("modal-bg")) closeModal(); });
+  (() => {
+  const bg = document.getElementById("modal-bg");
+  let mousedownOnBg = false;
+  bg.addEventListener("mousedown", e => { mousedownOnBg = e.target === bg; });
+  bg.addEventListener("mouseup", e => { if (mousedownOnBg && e.target === bg) closeModal(); mousedownOnBg = false; });
+})();
   document.getElementById('modal-save').addEventListener('click', saveModal);
   document.getElementById('m-title').addEventListener('keydown', e => { if (e.key === 'Enter') saveModal(); });
 }
