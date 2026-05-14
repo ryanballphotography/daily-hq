@@ -601,6 +601,7 @@ const BLOCKS = [
 function renderWeekly() {
   const el = document.getElementById('weekly-tasks');
   if (!el) return;
+  renderWeeklyGrid();
   generateWeeklyPlan(window._spData || null, window._calEvents || []);
   const days = getWeekDays();
 
@@ -702,18 +703,10 @@ async function dropTaskUnscheduled(event) {
 
 
 async function generateWeeklyPlan(spData, calEvents) {
-  const el = document.getElementById('weekly-pa-note');
-  if (!el) return;
-  el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Analysing your week...</div>';
-
-  // Build full week context
+  // Store day summaries for rendering in grid headers
+  window._weeklyDaySummaries = {};
   const days = getWeekDays();
   const weekEnd = days[6].toISOString().split('T')[0];
-
-  // Tasks this week
-  const weekTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] <= weekEnd);
-  const overdueTasks = tasks.filter(t => isOverdue(t.due_date));
-  const undatedTasks = tasks.filter(t => !t.due_date);
 
   const tasksByDay = {};
   days.forEach(d => {
@@ -721,50 +714,29 @@ async function generateWeeklyPlan(spData, calEvents) {
     tasksByDay[ds] = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === ds);
   });
 
-  // Build context string
   let context = 'Today is ' + new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + '.\n\n';
 
-  // Shoots this fortnight
   if (spData && spData.shoots && spData.shoots.length) {
     context += 'SHOOTS:\n' + spData.shoots.map(s => '- ' + s.name + ' on ' + s.startDate).join('\n') + '\n\n';
   }
-
-  // Stale quotes
-  if (spData && spData.quotes && spData.quotes.length) {
-    const stale = spData.quotes.filter(q => Math.floor((new Date() - new Date(q.createdAt)) / 86400000) >= 2);
-    if (stale.length) context += 'STALE QUOTES: ' + stale.map(q => q.name + ' for ' + q.clientName).join(', ') + '\n\n';
-  }
-
-  // Calendar events this week
   if (calEvents && calEvents.length) {
     const weekCal = calEvents.filter(e => e.start.split('T')[0] <= weekEnd);
     if (weekCal.length) {
-      context += 'CALENDAR THIS WEEK:\n' + weekCal.map(e => {
+      context += 'CALENDAR:\n' + weekCal.map(e => {
         const d = new Date(e.start.split('T')[0] + 'T00:00:00');
         return '- ' + d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'}) + ': ' + e.title;
       }).join('\n') + '\n\n';
     }
   }
-
-  // Tasks by day
-  context += 'TASKS BY DAY THIS WEEK:\n';
+  context += 'TASKS BY DAY:\n';
   days.forEach(d => {
     const ds = d.toISOString().split('T')[0];
     const dayLabel = d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'});
     const dayTasks = tasksByDay[ds];
-    if (dayTasks.length) {
-      context += dayLabel + ': ' + dayTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
-    } else {
-      context += dayLabel + ': nothing scheduled\n';
-    }
+    context += dayLabel + ' (' + ds + '): ' + (dayTasks.length ? dayTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') : 'nothing scheduled') + '\n';
   });
-
-  if (overdueTasks.length) {
-    context += '\nOVERDUE: ' + overdueTasks.map(t => t.title).join(', ') + '\n';
-  }
-  if (undatedTasks.length) {
-    context += '\nUNSCHEDULED TASKS (need placing in week): ' + undatedTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
-  }
+  const undated = tasks.filter(t => !t.due_date);
+  if (undated.length) context += '\nUNSCHEDULED: ' + undated.map(t => t.title).join(', ') + '\n';
 
   try {
     const res = await fetch('/api/pa/briefing', {
@@ -772,115 +744,101 @@ async function generateWeeklyPlan(spData, calEvents) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week and produce a practical work plan. Important rules: (1) Shoot days are hard blocks - no work. (2) Kids and family calendar events are background context only - Ryan is aware of them and works around them, do not treat them as work blockers unless they are overnight stays or explicitly take the whole day. (3) Focus on work priorities, deadlines, and when to do specific tasks. (4) Only flag family commitments if they genuinely affect work capacity e.g. a pickup at 3pm means finish work by 2:30pm. Format: one punchy sentence about the week, then day-by-day with day name in caps and bullet points. End with a Watch out line only for genuine work risks. Keep bullets to one line.",
-
-        messages: [{ role: 'user', content: context + '\n\nGive me my weekly plan.' }]
+        max_tokens: 1000,
+        system: "You are Ryans personal PA. Analyse his week and return ONLY a JSON object, no markdown, no explanation. Format: { \"weekSummary\": \"one punchy sentence about the shape of the week\", \"watchOut\": \"one line risk warning or empty string\", \"days\": { \"YYYY-MM-DD\": \"one short sentence about this day e.g. Admin morning, shoot prep afternoon\" } }. Rules: shoot days = blocked. Family events = context only unless they consume the whole day. Focus on work capacity. Keep each day summary under 8 words.",
+        messages: [{ role: 'user', content: context + '\nReturn JSON only.' }]
       })
     });
     const data = await res.json();
-    const raw = data.content[0].text;
-    el.innerHTML = raw.split('\n').map(line => {
-      if (!line.trim()) return '<div style="height:8px;"></div>';
-      if (line.startsWith('•')) return '<div style="display:flex;gap:8px;margin-top:3px;"><span style="flex-shrink:0;">•</span><span>' + line.slice(1).trim() + '</span></div>';
-      if (line.match(/^[A-Z]{3,}/) ) return '<div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--text3);margin-top:14px;margin-bottom:2px;text-transform:uppercase;">' + line + '</div>';
-      return '<div style="font-weight:500;margin-bottom:4px;">' + line + '</div>';
-    }).join('');
+    const raw = data.content[0].text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(raw);
+    window._weeklyDaySummaries = parsed.days || {};
+    window._weekSummary = parsed.weekSummary || '';
+    window._weekWatchOut = parsed.watchOut || '';
   } catch(e) {
-    el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Weekly plan unavailable.</div>';
+    console.log('Weekly plan error', e);
+    window._weeklyDaySummaries = {};
   }
+
+  // Re-render the grid now we have summaries
+  renderWeeklyGrid();
 }
 
-
-async function generateWeeklyPlan(spData, calEvents) {
-  const el = document.getElementById('weekly-pa-note');
+function renderWeeklyGrid() {
+  const el = document.getElementById('weekly-tasks');
   if (!el) return;
-  el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Analysing your week...</div>';
-
-  // Build full week context
   const days = getWeekDays();
-  const weekEnd = days[6].toISOString().split('T')[0];
+  const summaries = window._weeklyDaySummaries || {};
 
-  // Tasks this week
-  const weekTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] <= weekEnd);
-  const overdueTasks = tasks.filter(t => isOverdue(t.due_date));
-  const undatedTasks = tasks.filter(t => !t.due_date);
+  // Week summary bar
+  let html = '';
+  if (window._weekSummary) {
+    html += '<div style="font-size:13px;font-weight:500;margin-bottom:0.5rem;">' + window._weekSummary + '</div>';
+  }
+  if (window._weekWatchOut) {
+    html += '<div style="font-size:12px;color:var(--p1);margin-bottom:1rem;">⚠ ' + window._weekWatchOut + '</div>';
+  }
 
-  const tasksByDay = {};
+  html += '<div class="week-grid-blocks">';
+  // Header row with day summaries
+  html += '<div class="wgb-header-row">';
+  html += '<div class="wgb-block-col"></div>';
   days.forEach(d => {
-    const ds = d.toISOString().split('T')[0];
-    tasksByDay[ds] = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === ds);
+    const dateStr = d.toISOString().split('T')[0];
+    const isToday = dateStr === today;
+    const summary = summaries[dateStr] || '';
+    html += '<div class="wgb-day-header' + (isToday ? ' wgb-today' : '') + '">';
+    html += '<div class="wgb-day-name">' + d.toLocaleDateString('en-GB', { weekday: 'short' }) + '</div>';
+    html += '<div class="wgb-day-num' + (isToday ? ' wgb-day-num-today' : '') + '">' + d.getDate() + '</div>';
+    if (summary) html += '<div class="wgb-day-summary">' + summary + '</div>';
+    html += '</div>';
   });
+  html += '</div>';
 
-  // Build context string
-  let context = 'Today is ' + new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + '.\n\n';
-
-  // Shoots this fortnight
-  if (spData && spData.shoots && spData.shoots.length) {
-    context += 'SHOOTS:\n' + spData.shoots.map(s => '- ' + s.name + ' on ' + s.startDate).join('\n') + '\n\n';
-  }
-
-  // Stale quotes
-  if (spData && spData.quotes && spData.quotes.length) {
-    const stale = spData.quotes.filter(q => Math.floor((new Date() - new Date(q.createdAt)) / 86400000) >= 2);
-    if (stale.length) context += 'STALE QUOTES: ' + stale.map(q => q.name + ' for ' + q.clientName).join(', ') + '\n\n';
-  }
-
-  // Calendar events this week
-  if (calEvents && calEvents.length) {
-    const weekCal = calEvents.filter(e => e.start.split('T')[0] <= weekEnd);
-    if (weekCal.length) {
-      context += 'CALENDAR THIS WEEK:\n' + weekCal.map(e => {
-        const d = new Date(e.start.split('T')[0] + 'T00:00:00');
-        return '- ' + d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'}) + ': ' + e.title;
-      }).join('\n') + '\n\n';
-    }
-  }
-
-  // Tasks by day
-  context += 'TASKS BY DAY THIS WEEK:\n';
-  days.forEach(d => {
-    const ds = d.toISOString().split('T')[0];
-    const dayLabel = d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'});
-    const dayTasks = tasksByDay[ds];
-    if (dayTasks.length) {
-      context += dayLabel + ': ' + dayTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
-    } else {
-      context += dayLabel + ': nothing scheduled\n';
-    }
-  });
-
-  if (overdueTasks.length) {
-    context += '\nOVERDUE: ' + overdueTasks.map(t => t.title).join(', ') + '\n';
-  }
-  if (undatedTasks.length) {
-    context += '\nUNSCHEDULED TASKS (need placing in week): ' + undatedTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') + '\n';
-  }
-
-  try {
-    const res = await fetch('/api/pa/briefing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        system: "You are Ryans personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nandos, Ocado, and Ardbeg. Current year 2026. Analyse Ryans full week and produce a practical work plan. Important rules: (1) Shoot days are hard blocks - no work. (2) Kids and family calendar events are background context only - Ryan is aware of them and works around them, do not treat them as work blockers unless they are overnight stays or explicitly take the whole day. (3) Focus on work priorities, deadlines, and when to do specific tasks. (4) Only flag family commitments if they genuinely affect work capacity e.g. a pickup at 3pm means finish work by 2:30pm. Format: one punchy sentence about the week, then day-by-day with day name in caps and bullet points. End with a Watch out line only for genuine work risks. Keep bullets to one line.",
-
-        messages: [{ role: 'user', content: context + '\n\nGive me my weekly plan.' }]
-      })
+  // Block rows
+  BLOCKS.forEach(block => {
+    html += '<div class="wgb-row">';
+    html += '<div class="wgb-block-col"><div class="wgb-block-label">' + block.label + '</div><div class="wgb-block-time">' + block.time + '</div></div>';
+    days.forEach(d => {
+      const dateStr = d.toISOString().split('T')[0];
+      const isToday = dateStr === today;
+      const cellTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === dateStr && t.time_block === block.id);
+      html += '<div class="wgb-cell' + (isToday ? ' wgb-cell-today' : '') + '" data-date="' + dateStr + '" data-block="' + block.id + '" ondragover="event.preventDefault()" ondrop="dropTask(event)">';
+      cellTasks.forEach(t => {
+        const cat = t.category || 'work';
+        html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
+        html += '<div class="wgb-task-title">' + t.title + '</div>';
+        if (t.tag) html += '<div class="wgb-task-tag">' + t.tag + '</div>';
+        html += '</div>';
+      });
+      html += '</div>';
     });
-    const data = await res.json();
-    const raw = data.content[0].text;
-    el.innerHTML = raw.split('\n').map(line => {
-      if (!line.trim()) return '<div style="height:8px;"></div>';
-      if (line.startsWith('•')) return '<div style="display:flex;gap:8px;margin-top:3px;"><span style="flex-shrink:0;">•</span><span>' + line.slice(1).trim() + '</span></div>';
-      if (line.match(/^[A-Z]{3,}/) ) return '<div style="font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--text3);margin-top:14px;margin-bottom:2px;text-transform:uppercase;">' + line + '</div>';
-      return '<div style="font-weight:500;margin-bottom:4px;">' + line + '</div>';
-    }).join('');
-  } catch(e) {
-    el.innerHTML = '<div style="color:var(--text3);font-size:12px;">Weekly plan unavailable.</div>';
+    html += '</div>';
+  });
+
+  // Unscheduled
+  const unscheduled = tasks.filter(t => !t.due_date || !t.time_block);
+  html += '<div class="wgb-unscheduled">';
+  html += '<div class="wgb-unscheduled-label">Unscheduled - drag to schedule</div>';
+  html += '<div class="wgb-unscheduled-tasks" ondragover="event.preventDefault()" ondrop="dropTaskUnscheduled(event)">';
+  if (unscheduled.length) {
+    unscheduled.forEach(t => {
+      const cat = t.category || 'work';
+      html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
+      html += '<div class="wgb-task-title">' + t.title + '</div>';
+      if (t.due_date) html += '<div class="wgb-task-tag">' + formatDate(t.due_date) + '</div>';
+      html += '</div>';
+    });
+  } else {
+    html += '<div style="font-size:12px;color:var(--text3);">All tasks scheduled.</div>';
   }
+  html += '</div></div></div>';
+  el.innerHTML = html;
 }
+
+
+
+
 
 
 async function generateWeeklyPlan(spData, calEvents) {
