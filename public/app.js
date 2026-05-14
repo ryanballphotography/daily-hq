@@ -557,6 +557,10 @@ function getWeekDays() {
   return days;
 }
 
+function localDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 function formatDayLabel(d) {
   const now = new Date();
   now.setHours(0,0,0,0);
@@ -660,7 +664,7 @@ async function generateWeeklyPlan(spData, calEvents) {
 
   const tasksByDay = {};
   days.forEach(d => {
-    const ds = d.toISOString().split('T')[0];
+    const ds = localDateStr(d);
     tasksByDay[ds] = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === ds);
   });
 
@@ -680,7 +684,7 @@ async function generateWeeklyPlan(spData, calEvents) {
   }
   context += 'TASKS BY DAY:\n';
   days.forEach(d => {
-    const ds = d.toISOString().split('T')[0];
+    const ds = localDateStr(d);
     const dayLabel = d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'});
     const dayTasks = tasksByDay[ds];
     context += dayLabel + ' (' + ds + '): ' + (dayTasks.length ? dayTasks.map(t => t.title + ' (' + t.priority + ')').join(', ') : 'nothing scheduled') + '\n';
@@ -736,7 +740,7 @@ function renderWeeklyGrid() {
   // Day summary cards
   html += '<div class="week-day-cards">';
   days.forEach(d => {
-    const dateStr = d.toISOString().split('T')[0];
+    const dateStr = localDateStr(d);
     const isToday = dateStr === today;
     const summary = summaries[dateStr] || '';
     const dayName = d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase();
@@ -763,7 +767,7 @@ function renderWeeklyGrid() {
   html += '<div class="wgb-header-row">';
   html += '<div class="wgb-block-col"></div>';
   days.forEach(d => {
-    const dateStr = d.toISOString().split('T')[0];
+    const dateStr = localDateStr(d);
     const isToday = dateStr === today;
     html += '<div class="wgb-day-header' + (isToday ? ' wgb-today' : '') + '">';
     html += '<div class="wgb-day-name">' + d.toLocaleDateString('en-GB', { weekday: 'short' }) + '</div>';
@@ -776,7 +780,7 @@ function renderWeeklyGrid() {
     html += '<div class="wgb-row">';
     html += '<div class="wgb-block-col"><div class="wgb-block-label">' + block.label + '</div><div class="wgb-block-time">' + block.time + '</div></div>';
     days.forEach(d => {
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = localDateStr(d);
       const isToday = dateStr === today;
       const cellTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === dateStr && t.time_block === block.id);
       html += '<div class="wgb-cell' + (isToday ? ' wgb-cell-today' : '') + '" data-date="' + dateStr + '" data-block="' + block.id + '" ondragover="event.preventDefault()" ondrop="dropTask(event)">';
@@ -859,7 +863,7 @@ async function loadInboxCalendar() {
     }
     let html = '<div class="inbox-cal-strip">';
     days.forEach(d => {
-      const ds = d.toISOString().split('T')[0];
+      const ds = localDateStr(d);
       const isToday = ds === today;
       const label = isToday ? 'Today' : d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
       const dayEvents = events.filter(e => e.start.split('T')[0] === ds);
