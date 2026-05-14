@@ -360,7 +360,8 @@ async function generateBriefingWithContext(spData, calEvents) {
   const el = document.getElementById('pa-note-text');
   const overdue = tasks.filter(t => isOverdue(t.due_date)).length;
   const dueToday = tasks.filter(t => isDueToday(t.due_date)).length;
-  const taskList = tasks.slice(0, 10).map(t => '"' + t.title + '" (' + t.category + ', ' + t.priority + (t.due_date ? ', due ' + formatDate(t.due_date) : '') + ')').join('; ');
+  const todayTasks = tasks.filter(t => isOverdue(t.due_date) || isDueToday(t.due_date));
+  const taskList = todayTasks.map(t => '"' + t.title + '" (' + t.category + ', ' + t.priority + (isOverdue(t.due_date) ? ', OVERDUE' : ', due today') + ')').join('; ');
 
   let shootContext = '';
   if (calEvents && calEvents.length) {
