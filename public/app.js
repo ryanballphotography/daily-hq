@@ -182,7 +182,17 @@ function renderToday() {
 function renderAll() {
   const el = document.getElementById('all-tasks');
   if (!tasks.length) { el.innerHTML = '<div class="empty">No open tasks.</div>'; return; }
-  el.innerHTML = tasks.map(taskHTML).join('');
+  const sorted = sortTasks([...tasks]);
+  const overdue = sorted.filter(t => isOverdue(t.due_date));
+  const dueToday = sorted.filter(t => isDueToday(t.due_date));
+  const upcoming = sorted.filter(t => t.due_date && !isOverdue(t.due_date) && !isDueToday(t.due_date));
+  const undated = sorted.filter(t => !t.due_date);
+  let html = '';
+  if (overdue.length) html += '<div class="section-lbl">Overdue</div>' + overdue.map(taskHTML).join('');
+  if (dueToday.length) html += '<div class="section-lbl">Today</div>' + dueToday.map(taskHTML).join('');
+  if (upcoming.length) html += '<div class="section-lbl">Upcoming</div>' + upcoming.map(taskHTML).join('');
+  if (undated.length) html += '<div class="section-lbl">No date</div>' + undated.map(taskHTML).join('');
+  el.innerHTML = html;
 }
 
 async function renderCompleted() {
