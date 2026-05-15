@@ -175,6 +175,44 @@
     </div>
   </div>
 
+
+  <!-- Mobile tab bar -->
+  <div class="mobile-tabs" id="mobile-tabs">
+    <button class="mobile-tab active" onclick="mobileNav('inbox',this)">
+      <i class="ti ti-inbox"></i>
+      <span>Inbox</span>
+      <span class="mobile-tab-badge" id="mob-inbox-badge" style="display:none"></span>
+    </button>
+    <button class="mobile-tab" onclick="mobileNav('today',this)">
+      <i class="ti ti-layout-dashboard"></i>
+      <span>Today</span>
+    </button>
+    <button class="mobile-tab" onclick="mobileNav('weekly',this)">
+      <i class="ti ti-layout-columns"></i>
+      <span>Weekly</span>
+    </button>
+    <button class="mobile-tab" onclick="mobileNav('all',this)">
+      <i class="ti ti-list-check"></i>
+      <span>Tasks</span>
+      <span class="mobile-tab-badge" id="mob-task-badge" style="display:none"></span>
+    </button>
+    <button class="mobile-tab" onclick="toggleMoreSheet()">
+      <i class="ti ti-dots"></i>
+      <span>More</span>
+    </button>
+  </div>
+
+  <!-- Mobile more sheet -->
+  <div class="mobile-more-sheet" id="mobile-more-sheet">
+    <div class="mobile-more-item" onclick="mobileNav('scheduled',null);toggleMoreSheet()"><i class="ti ti-list-details"></i> Scheduled</div>
+    <div class="mobile-more-item" onclick="mobileNav('completed',null);toggleMoreSheet()"><i class="ti ti-circle-check"></i> Completed</div>
+    <div class="mobile-more-item" onclick="mobileNav('calendar',null);toggleMoreSheet()"><i class="ti ti-calendar"></i> Calendar</div>
+    <div class="mobile-more-item" onclick="mobileNav('conversations',null);toggleMoreSheet()"><i class="ti ti-messages"></i> Conversations</div>
+    <div class="mobile-more-item" onclick="window.open('https://shoot-planner.ryanballphotography.com','_blank');toggleMoreSheet()"><i class="ti ti-camera"></i> Shoot Planner</div>
+    <div class="mobile-more-item" onclick="window.open('https://the-darkroom-production.up.railway.app','_blank');toggleMoreSheet()"><i class="ti ti-moon"></i> The Darkroom</div>
+    <div class="mobile-more-item" onclick="window.open('https://app.freeagent.com','_blank');toggleMoreSheet()"><i class="ti ti-receipt"></i> FreeAgent</div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

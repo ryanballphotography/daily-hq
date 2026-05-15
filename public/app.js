@@ -1005,6 +1005,63 @@ function loadConversation(id) {
   toggleChat();
 }
 
+
+// ── Mobile navigation ─────────────────────────────────────────────────────────
+function isMobile() { return window.innerWidth <= 768; }
+
+function mobileNav(view, tabEl) {
+  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+  document.getElementById('view-' + view).classList.remove('hidden');
+  document.getElementById('topbar-title').textContent = 
+    view === 'inbox' ? 'Inbox' :
+    view === 'today' ? 'Today' :
+    view === 'weekly' ? 'Weekly' :
+    view === 'all' ? 'Tasks' :
+    view === 'scheduled' ? 'Scheduled' :
+    view === 'completed' ? 'Completed' :
+    view === 'calendar' ? 'Calendar' :
+    view === 'conversations' ? 'Conversations' : view;
+  document.querySelectorAll('.mobile-tab').forEach(t => t.classList.remove('active'));
+  if (tabEl) tabEl.classList.add('active');
+  // Also sync desktop sidebar
+  document.querySelectorAll('.ni[data-view]').forEach(n => {
+    n.classList.toggle('active', n.dataset.view === view);
+  });
+  if (view === 'today') renderToday();
+  if (view === 'all') renderAll();
+  if (view === 'completed') renderCompleted();
+  if (view === 'calendar') showCalendarView();
+  if (view === 'inbox') { showInboxPrompt(); loadInboxCalendar(); }
+  if (view === 'scheduled') renderScheduled();
+  if (view === 'weekly') renderWeekly();
+  if (view === 'conversations') renderConversations();
+}
+
+function toggleMoreSheet() {
+  const sheet = document.getElementById('mobile-more-sheet');
+  sheet.classList.toggle('open');
+}
+
+// Close more sheet when tapping outside
+document.addEventListener('click', e => {
+  const sheet = document.getElementById('mobile-more-sheet');
+  if (sheet && sheet.classList.contains('open') && !sheet.contains(e.target) && !e.target.closest('.mobile-tab')) {
+    sheet.classList.remove('open');
+  }
+});
+
+function syncMobileBadges() {
+  const taskBadge = document.getElementById('mob-task-badge');
+  const inboxBadge = document.getElementById('mob-inbox-badge');
+  const count = tasks.length;
+  if (taskBadge) { taskBadge.textContent = count; taskBadge.style.display = count ? 'block' : 'none'; }
+  const inboxCount = document.getElementById('inbox-badge');
+  if (inboxBadge && inboxCount) { 
+    inboxBadge.textContent = inboxCount.textContent; 
+    inboxBadge.style.display = inboxCount.style.display; 
+  }
+}
+
 function showCalendarView() {
   var c = document.getElementById('view-calendar');
   if (c && !c.querySelector('iframe')) {
