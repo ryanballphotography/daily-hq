@@ -310,3 +310,5 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   /* Add task button */
   .btn-add { font-size: 12px; padding: 5px 10px; }
 }
+.mobile-only { display: none !important; }
+@media (max-width: 768px) { .mobile-only { display: flex !important; } }

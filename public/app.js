@@ -828,7 +828,7 @@ function renderWeeklyGrid() {
       html += '<div class="wgb-cell' + (isToday ? ' wgb-cell-today' : '') + '" data-date="' + dateStr + '" data-block="' + block.id + '" ondragover="event.preventDefault()" ondrop="dropTask(event)">';
       cellTasks.forEach(t => {
         const cat = t.category || 'work';
-        html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" data-task-id="' + t.id + '" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
+        html += '<div class="wgb-task wgb-task-' + cat + '" id="weekly-task-' + t.id + '" draggable="true" data-task-id="' + t.id + '" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')" onclick="completeTaskWeekly(' + t.id + ')">';
         html += '<div class="wgb-task-title">' + t.title + '</div>';
         if (t.tag) html += '<div class="wgb-task-tag">' + t.tag + '</div>';
         html += '</div>';
@@ -849,7 +849,7 @@ function renderWeeklyGrid() {
     html += '<div class="wgb-cell wgb-cell-notime' + (isToday ? ' wgb-cell-today' : '') + '" data-date="' + dateStr + '" data-block="" ondragover="event.preventDefault()" ondrop="dropTask(event)">';
     noTimeTasks.forEach(t => {
       const cat = t.category || 'work';
-      html += '<div class="wgb-task wgb-task-' + cat + '" draggable="true" data-task-id="' + t.id + '" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')">';
+      html += '<div class="wgb-task wgb-task-' + cat + '" id="weekly-task-' + t.id + '" draggable="true" data-task-id="' + t.id + '" ondragstart="dragTask(event,' + t.id + ')" ondblclick="editTask(' + t.id + ')" onclick="completeTaskWeekly(' + t.id + ')">';
       html += '<div class="wgb-task-title">' + t.title + '</div>';
       if (t.tag) html += '<div class="wgb-task-tag">' + t.tag + '</div>';
       html += '</div>';
@@ -1069,6 +1069,21 @@ function syncMobileBadges() {
   if (inboxBadge && inboxCount) { 
     inboxBadge.textContent = inboxCount.textContent; 
     inboxBadge.style.display = inboxCount.style.display; 
+  }
+}
+
+
+async function completeTaskWeekly(id) {
+  await fetch('/api/tasks/' + id + '/complete', { method: 'PATCH' });
+  tasks = tasks.filter(t => t.id !== id);
+  updateBadge();
+  // Don't re-render — just strike through the task visually
+  const el = document.getElementById('weekly-task-' + id);
+  if (el) {
+    el.style.opacity = '0.4';
+    el.style.textDecoration = 'line-through';
+    el.draggable = false;
+    el.ondragstart = null;
   }
 }
 
