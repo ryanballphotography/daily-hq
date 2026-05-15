@@ -397,7 +397,7 @@ async function generateBriefingWithContext(spData, calEvents) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5',
         max_tokens: 1000,
         system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer based in London and Somerset running his own limited company with clients including Lidl, Nando\'s, Ocado, and Ardbeg. The current year is 2026. Give a short direct morning briefing. Be blunt, no softening. IMPORTANT rules: (1) If UPCOMING SHOOTS lists a shoot as today, lead with that. (2) Only surface tasks that are overdue or due TODAY. Never mention tasks due tomorrow or later — they belong in the weekly view not the daily briefing. The one exception is if there is a shoot tomorrow, mention prep needed today. (3) Output plain text only, no markdown. One punchy sentence summarising what matters right now, then bullet points (use • ) for each actionable item. Use as many or as few bullets as needed — no minimum, no maximum. If nothing is urgent just say so in one sentence.',
         messages: [{ role: 'user', content: 'Here is my context:\n' + context + '\n\nGive me my morning briefing.' }]
@@ -439,7 +439,7 @@ async function sendChat() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5',
         max_tokens: 1000,
         system: 'You are Ryan\'s personal PA. Ryan is a commercial food photographer in London and Somerset with clients including Lidl, Nando\'s, Ocado, Ardbeg. The current date and time is ' + new Date().toLocaleDateString('en-GB', {weekday:'long',day:'numeric',month:'long',year:'numeric'}) + ' at ' + new Date().toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}) + '. Be direct and blunt — no softening, no hedging. Short sentences. One clear answer, not options. Connect advice to real consequences. Money and client emails always come first. He avoids sending estimates and following up with clients — call this out. He does admin late at night which hurts his sleep — push him to do it earlier. Creative work and gardening are legitimate productivity. When he asks if he can do something enjoyable, check his tasks and give a straight yes or no with one reason.\n\nHis open tasks:\n' + taskContext + '\n\nCalendar events (next 14 days):\n' + calendarContext,
         messages: chatHistory
@@ -729,7 +729,7 @@ async function generateWeeklyPlan(spData, calEvents) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5',
         max_tokens: 1000,
         system: "You are Ryans personal PA. Analyse his week and return ONLY a JSON object, no markdown, no explanation. Format: { \"weekSummary\": \"one punchy sentence about the shape of the week\", \"watchOut\": \"one line risk warning or empty string\", \"days\": { \"YYYY-MM-DD\": \"one short sentence about this day e.g. Admin morning, shoot prep afternoon\" } }. Rules: shoot days = blocked. Family events = context only unless they consume the whole day. Focus on work capacity. Keep each day summary under 8 words.",
         messages: [{ role: 'user', content: context + '\nReturn JSON only.' }]
