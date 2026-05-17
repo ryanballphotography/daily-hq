@@ -121,56 +121,60 @@
   <!-- Add task modal -->
   <div class="modal-bg hidden" id="modal-bg">
     <div class="modal">
-      <div class="modal-title">New task</div>
-      <div class="modal-field">
-        <label>Task</label>
-        <input type="text" id="m-title" placeholder="What needs doing?" />
-      </div>
-      <div class="modal-field">
-        <label>Notes</label>
-        <textarea id="m-notes" placeholder="Any extra detail..."></textarea>
-      </div>
-      <div class="modal-row">
-        <div class="modal-field">
-          <label>Due date</label>
-          <input type="date" id="m-due" />
-        </div>
-        <div class="modal-field">
-          <label>Priority</label>
-          <select id="m-priority">
-            <option value="p3">P3 — low</option>
-            <option value="p2">P2 — medium</option>
-            <option value="p1">P1 — high</option>
-          </select>
+      <div class="modal-header">
+        <div class="modal-title">New task</div>
+        <div class="modal-actions">
+          <button class="btn-cancel" id="modal-cancel">Cancel</button>
+          <button class="btn-save" id="modal-save">Save</button>
         </div>
       </div>
-      <div class="modal-row">
+      <div class="modal-body">
         <div class="modal-field">
-          <label>Category</label>
-          <select id="m-category">
-            <option value="work">Work</option>
-            <option value="exercise">Exercise</option>
-            <option value="home">Home</option>
-            <option value="personal">Personal</option>
-          </select>
+          <label>Task</label>
+          <input type="text" id="m-title" placeholder="What needs doing?" />
         </div>
         <div class="modal-field">
-          <label>Recurring</label>
-          <select id="m-recurring">
-            <option value="">None</option>
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
+          <label>Notes</label>
+          <textarea id="m-notes" placeholder="Any extra detail..."></textarea>
         </div>
-      </div>
-      <div class="modal-field">
-        <label>Tag</label>
-        <input type="text" id="m-tag" placeholder="e.g. Lidl, Admin" />
-      </div>
-      <div class="modal-actions">
-        <button class="btn-cancel" id="modal-cancel">Cancel</button>
-        <button class="btn-save" id="modal-save">Save task</button>
+        <div class="modal-row">
+          <div class="modal-field">
+            <label>Due date</label>
+            <input type="date" id="m-due" />
+          </div>
+          <div class="modal-field">
+            <label>Priority</label>
+            <select id="m-priority">
+              <option value="p3">P3 — low</option>
+              <option value="p2">P2 — medium</option>
+              <option value="p1">P1 — high</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-row">
+          <div class="modal-field">
+            <label>Category</label>
+            <select id="m-category">
+              <option value="work">Work</option>
+              <option value="exercise">Exercise</option>
+              <option value="home">Home</option>
+              <option value="personal">Personal</option>
+            </select>
+          </div>
+          <div class="modal-field">
+            <label>Recurring</label>
+            <select id="m-recurring">
+              <option value="">None</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label>Tag</label>
+          <input type="text" id="m-tag" placeholder="e.g. Lidl, Admin" />
+        </div>
       </div>
     </div>
   </div>

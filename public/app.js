@@ -1087,6 +1087,40 @@ async function completeTaskWeekly(id) {
   }
 }
 
+
+// ── Pull to refresh ───────────────────────────────────────────────────────────
+(function() {
+  if (window.innerWidth > 768) return;
+  let startY = 0;
+  let pulling = false;
+  const indicator = document.createElement('div');
+  indicator.className = 'pull-refresh-indicator';
+  indicator.innerHTML = '<i class="ti ti-refresh"></i>';
+  document.body.appendChild(indicator);
+
+  document.addEventListener('touchstart', e => {
+    startY = e.touches[0].clientY;
+    pulling = window.scrollY === 0;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!pulling) return;
+    const diff = e.touches[0].clientY - startY;
+    if (diff > 60) indicator.classList.add('visible');
+    else indicator.classList.remove('visible');
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    const diff = e.changedTouches[0].clientY - startY;
+    indicator.classList.remove('visible');
+    if (pulling && diff > 60) {
+      indicator.innerHTML = '<i class="ti ti-loader"></i>';
+      setTimeout(() => location.reload(), 300);
+    }
+    pulling = false;
+  });
+})();
+
 function showCalendarView() {
   var c = document.getElementById('view-calendar');
   if (c && !c.querySelector('iframe')) {

@@ -333,3 +333,60 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   /* Fix save button always visible */
   .modal-actions { position: sticky; bottom: 0; background: var(--bg); padding: 0.75rem 0 0; border-top: 0.5px solid var(--border); margin-top: 0.5rem; }
 }
+
+/* ── Modal header/body split ── */
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+.modal-header .modal-title { margin-bottom: 0; }
+.modal-header .modal-actions { display: flex; gap: 8px; margin-top: 0; }
+.modal-body { overflow-y: auto; }
+
+@media (max-width: 768px) {
+  .modal { 
+    width: 100%; 
+    max-width: 100%; 
+    border-radius: 16px 16px 0 0; 
+    padding: 1rem;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+    max-height: 75dvh;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-header { 
+    flex-shrink: 0;
+    padding-bottom: 0.75rem;
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 0.75rem;
+  }
+  .modal-body { 
+    overflow-y: auto; 
+    flex: 1;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal-field input, .modal-field select, .modal-field textarea { font-size: 16px; }
+  .modal-field { margin-bottom: 0.6rem; }
+  .modal-field textarea { height: 60px; }
+  /* Hide desktop-style bottom actions on mobile - they're in header now */
+  .modal > .modal-actions { display: none; }
+}
+
+/* ── Pull to refresh ── */
+.pull-refresh-indicator {
+  position: fixed;
+  top: -50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--text3);
+  transition: top 0.2s;
+  z-index: 999;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.pull-refresh-indicator.visible { top: 16px; }
