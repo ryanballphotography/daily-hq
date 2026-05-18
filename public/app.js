@@ -240,8 +240,11 @@ async function editCompletedTask(id) {
   document.getElementById('m-category').value = t.category || 'work';
   document.getElementById('m-recurring').value = t.recurring || '';
   document.getElementById('m-tag').value = t.tag || '';
+  const doneEl = document.getElementById('m-done');
+  if (doneEl) doneEl.checked = t.done || false;
   document.getElementById('modal-bg').classList.remove('hidden');
   document.getElementById('modal-bg')._editId = id;
+  document.getElementById('modal-bg')._wasCompleted = t.done || false;
   setTimeout(() => document.getElementById('m-title').focus(), 50);
 }
 
@@ -277,14 +280,27 @@ async function saveModal() {
   const due = document.getElementById('m-due').value;
   const editId = document.getElementById('modal-bg')._editId;
   const markDone = document.getElementById('m-done') && document.getElementById('m-done').checked;
-  if (editId && markDone) {
+  const wasCompleted = document.getElementById('modal-bg')._wasCompleted || false;
+  if (editId && markDone && !wasCompleted) {
     await fetch('/api/tasks/' + editId + '/complete', { method: 'PATCH' });
     tasks = tasks.filter(t => t.id !== editId);
     updateBadge();
     document.getElementById('modal-bg')._editId = undefined;
+    document.getElementById('modal-bg')._wasCompleted = undefined;
     const doneEl = document.getElementById('m-done'); if (doneEl) doneEl.checked = false;
     closeModal();
     renderToday(); renderAll();
+    return;
+  }
+  if (editId && wasCompleted && !markDone) {
+    await fetch('/api/tasks/' + editId, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done: false, completed_at: null }) });
+    const freshRes = await fetch('/api/tasks');
+    tasks = await freshRes.json();
+    updateBadge();
+    document.getElementById('modal-bg')._editId = undefined;
+    document.getElementById('modal-bg')._wasCompleted = undefined;
+    closeModal();
+    renderToday(); renderAll(); renderCompleted();
     return;
   }
   if (editId) {
