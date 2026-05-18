@@ -203,12 +203,46 @@ async function renderCompleted() {
   if (!done.length) { el.innerHTML = '<div class="empty">Nothing completed yet.</div>'; return; }
   el.innerHTML = done.map(t => `
     <div class="task done">
-      <div class="check checked"><i class="ti ti-check"></i></div>
+      <div class="check checked" onclick="uncompleteTask(${t.id})" title="Mark incomplete"><i class="ti ti-check"></i></div>
       <div class="task-body">
         <div class="task-title">${t.title}</div>
-        <div class="task-meta"><span class="tag tag-${t.category || 'work'}">${t.category || 'work'}</span></div>
+        <div class="task-meta">
+          <span class="tag tag-${t.category || 'work'}">${t.category || 'work'}</span>
+          ${t.completed_at ? '<span class="task-date">' + new Date(t.completed_at).toLocaleDateString('en-GB', {day:'numeric',month:'short'}) + '</span>' : ''}
+        </div>
       </div>
+      <i class="ti ti-pencil task-del" onclick="editCompletedTask(${t.id})" style="margin-right:2px;"></i>
     </div>`).join('');
+}
+
+async function uncompleteTask(id) {
+  await fetch('/api/tasks/' + id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ done: false, completed_at: null })
+  });
+  const res = await fetch('/api/tasks');
+  tasks = await res.json();
+  updateBadge();
+  renderCompleted();
+  renderToday();
+}
+
+async function editCompletedTask(id) {
+  const res = await fetch('/api/tasks/completed');
+  const done = await res.json();
+  const t = done.find(t => t.id === id);
+  if (!t) return;
+  document.getElementById('m-title').value = t.title;
+  document.getElementById('m-notes').value = t.notes || '';
+  document.getElementById('m-due').value = t.due_date ? t.due_date.split('T')[0] : '';
+  document.getElementById('m-priority').value = t.priority || 'p3';
+  document.getElementById('m-category').value = t.category || 'work';
+  document.getElementById('m-recurring').value = t.recurring || '';
+  document.getElementById('m-tag').value = t.tag || '';
+  document.getElementById('modal-bg').classList.remove('hidden');
+  document.getElementById('modal-bg')._editId = id;
+  setTimeout(() => document.getElementById('m-title').focus(), 50);
 }
 
 function bindModal() {
@@ -242,6 +276,17 @@ async function saveModal() {
   if (!title) return;
   const due = document.getElementById('m-due').value;
   const editId = document.getElementById('modal-bg')._editId;
+  const markDone = document.getElementById('m-done') && document.getElementById('m-done').checked;
+  if (editId && markDone) {
+    await fetch('/api/tasks/' + editId + '/complete', { method: 'PATCH' });
+    tasks = tasks.filter(t => t.id !== editId);
+    updateBadge();
+    document.getElementById('modal-bg')._editId = undefined;
+    const doneEl = document.getElementById('m-done'); if (doneEl) doneEl.checked = false;
+    closeModal();
+    renderToday(); renderAll();
+    return;
+  }
   if (editId) {
     // Edit existing task
     await fetch('/api/tasks/' + editId, {
