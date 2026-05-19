@@ -6,6 +6,7 @@ let tasks = [];
 let chatHistory = [];
 
 document.addEventListener('DOMContentLoaded', () => {
+  initDarkMode();
   setDate();
   loadTasks();
   loadShootPlanner();
@@ -1181,6 +1182,29 @@ async function completeTaskWeekly(id) {
     pulling = false;
   });
 })();
+
+
+// ── Dark mode ─────────────────────────────────────────────────────────────────
+function initDarkMode() {
+  const saved = localStorage.getItem('theme');
+  if (saved) {
+    document.documentElement.setAttribute('data-theme', saved);
+    updateDarkIcon(saved);
+  }
+}
+
+function toggleDark() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  updateDarkIcon(next);
+}
+
+function updateDarkIcon(theme) {
+  const btn = document.getElementById('dark-toggle');
+  if (btn) btn.innerHTML = theme === 'dark' ? '<i class="ti ti-sun"></i>' : '<i class="ti ti-moon"></i>';
+}
 
 function showCalendarView() {
   var c = document.getElementById('view-calendar');
