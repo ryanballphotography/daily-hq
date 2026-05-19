@@ -380,3 +380,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   background: #f0f0f0;
   color: #1a1a1a;
 }
+
+[data-theme="dark"] .inbox-btn-accept,
+[data-theme="dark"] .btn-add,
+[data-theme="dark"] .btn-save {
+  background: #f0f0f0;
+  color: #1a1a1a;
+}
