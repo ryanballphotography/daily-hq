@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setDate();
   loadTasks();
   loadShootPlanner();
+  loadShootTasksForToday();
   bindNav();
   bindModal();
   bindChat();
@@ -39,6 +40,7 @@ function bindNav() {
       if (view === 'scheduled') renderScheduled();
       if (view === 'weekly') renderWeekly();
       if (view === 'conversations') renderConversations();
+      if (view === 'shoots') renderShoots();
     });
   });
   document.querySelectorAll('.ni.ext').forEach(el => {
@@ -1204,6 +1206,181 @@ function toggleDark() {
 function updateDarkIcon(theme) {
   const btn = document.getElementById('dark-toggle');
   if (btn) btn.innerHTML = theme === 'dark' ? '<i class="ti ti-sun"></i>' : '<i class="ti ti-moon"></i>';
+}
+
+
+// ── Shoots view ───────────────────────────────────────────────────────────────
+let shootTasksCache = {};
+
+async function renderShoots() {
+  const el = document.getElementById('shoots-content');
+  if (!el) return;
+  el.innerHTML = '<div class="empty">Loading shoots...</div>';
+
+  try {
+    const res = await fetch('/api/shoot-planner');
+    const data = await res.json();
+    const shoots = data.shoots || [];
+
+    if (!shoots.length) {
+      el.innerHTML = '<div class="empty">No upcoming shoots.</div>';
+      return;
+    }
+
+    let html = '';
+    for (const shoot of shoots) {
+      // Load tasks for this shoot
+      const taskRes = await fetch('/api/shoot-tasks/' + shoot.id);
+      const shootTasks = await taskRes.json();
+      shootTasksCache[shoot.id] = shootTasks;
+
+      const done = shootTasks.filter(t => t.done).length;
+      const total = shootTasks.length;
+      const pct = total ? Math.round((done / total) * 100) : 0;
+
+      const daysUntil = Math.ceil((new Date(shoot.startDate) - new Date()) / 86400000);
+      const daysLabel = daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : 'In ' + daysUntil + ' days';
+      const urgent = daysUntil <= 3;
+
+      html += '<div class="shoot-card" id="shoot-card-' + shoot.id + '">';
+      html += '<div class="shoot-card-header" onclick="toggleShootTasks(' + JSON.stringify(shoot.id) + ')">';
+      html += '<div class="shoot-card-info">';
+      html += '<div class="shoot-card-name">' + shoot.name + '</div>';
+      html += '<div class="shoot-card-meta">';
+      html += '<span class="tag tag-work">' + shoot.status + '</span>';
+      html += '<span class="task-date' + (urgent ? ' overdue' : '') + '">' + shoot.startDate + ' · ' + daysLabel + '</span>';
+      if (shoot.location) html += '<span class="tag">' + shoot.location + '</span>';
+      html += '</div>';
+      html += '</div>';
+      html += '<div class="shoot-card-progress">';
+      if (total > 0) {
+        html += '<div class="shoot-progress-bar"><div class="shoot-progress-fill" style="width:' + pct + '%"></div></div>';
+        html += '<div class="shoot-progress-label">' + done + '/' + total + '</div>';
+      }
+      html += '<i class="ti ti-chevron-down shoot-chevron" id="chevron-' + shoot.id + '"></i>';
+      html += '</div>';
+      html += '</div>';
+
+      // Task list (hidden by default)
+      html += '<div class="shoot-tasks hidden" id="shoot-tasks-' + shoot.id + '">';
+      if (total === 0) {
+        html += '<div style="padding:1rem;text-align:center;">';
+        html += '<div style="font-size:13px;color:var(--text3);margin-bottom:0.75rem;">No tasks yet for this shoot</div>';
+        html += '<button onclick="generateShootTasks(' + JSON.stringify(shoot.id) + ',' + JSON.stringify(shoot.name) + ')" style="font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text3);">Regenerate tasks</button>';
+        html += '<button onclick="generateShootTasks(' + JSON.stringify(shoot.id) + ',' + JSON.stringify(shoot.name) + ')" class="btn-add" style="font-size:12px;">Generate standard tasks</button>';
+      } else {
+        html += shootTasks.map(t => shootTaskHTML(t, shoot.id)).join('');
+        html += '<div style="padding:0.5rem 1rem 0.75rem;">';
+        html += '<button onclick="generateShootTasks(' + JSON.stringify(shoot.id) + ',' + JSON.stringify(shoot.name) + ')" style="font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text3);">Regenerate tasks</button>';
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    }
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<div class="empty">Could not load shoots.</div>';
+    console.error('Shoots error:', e);
+  }
+}
+
+function shootTaskHTML(t, shootId) {
+  return '<div class="shoot-task" id="shoot-task-' + t.id + '">' +
+    '<div class="check' + (t.done ? ' checked' : '') + '" onclick="toggleShootTask(' + t.id + ',\"' + shootId + '\")">' +
+    (t.done ? '<i class="ti ti-check"></i>' : '') +
+    '</div>' +
+    '<div class="shoot-task-body">' +
+    '<div class="shoot-task-title' + (t.done ? ' done' : '') + '">' + t.title + '</div>' +
+    (t.due_date ? '<div class="task-date" style="font-size:11px;margin-top:2px;">' + formatDate(t.due_date) + '</div>' : '') +
+    '</div>' +
+    '<input type="date" class="shoot-task-date" value="' + (t.due_date ? t.due_date.split('T')[0] : '') + '" onchange="setShootTaskDate(' + t.id + ',this.value,"' + shootId + '")" title="Set due date" />' +
+    '</div>';
+}
+
+function toggleShootTasks(shootId) {
+  const tasks = document.getElementById('shoot-tasks-' + shootId);
+  const chevron = document.getElementById('chevron-' + shootId);
+  if (tasks) tasks.classList.toggle('hidden');
+  if (chevron) chevron.style.transform = tasks.classList.contains('hidden') ? '' : 'rotate(180deg)';
+}
+
+async function toggleShootTask(taskId, shootId) {
+  const res = await fetch('/api/shoot-tasks/' + taskId + '/complete', { method: 'PATCH' });
+  const updated = await res.json();
+  if (shootTasksCache[shootId]) {
+    const t = shootTasksCache[shootId].find(t => t.id === taskId);
+    if (t) t.done = updated.done;
+  }
+  // Update UI
+  const el = document.getElementById('shoot-task-' + taskId);
+  if (el) {
+    const check = el.querySelector('.check');
+    const title = el.querySelector('.shoot-task-title');
+    if (updated.done) {
+      check.classList.add('checked');
+      check.innerHTML = '<i class="ti ti-check"></i>';
+      title.classList.add('done');
+    } else {
+      check.classList.remove('checked');
+      check.innerHTML = '';
+      title.classList.remove('done');
+    }
+  }
+  // Update progress bar
+  renderShootProgress(shootId);
+}
+
+function renderShootProgress(shootId) {
+  const tasks = shootTasksCache[shootId] || [];
+  const done = tasks.filter(t => t.done).length;
+  const total = tasks.length;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const bar = document.querySelector('#shoot-card-' + shootId + ' .shoot-progress-fill');
+  const label = document.querySelector('#shoot-card-' + shootId + ' .shoot-progress-label');
+  if (bar) bar.style.width = pct + '%';
+  if (label) label.textContent = done + '/' + total;
+}
+
+async function generateShootTasks(shootId, shootName) {
+  const res = await fetch('/api/shoot-tasks/' + shootId + '/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ shootName })
+  });
+  await res.json();
+  renderShoots();
+}
+
+async function setShootTaskDate(taskId, date, shootId) {
+  await fetch('/api/shoot-tasks/' + taskId, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ due_date: date || null })
+  });
+  if (shootTasksCache[shootId]) {
+    const t = shootTasksCache[shootId].find(t => t.id === taskId);
+    if (t) t.due_date = date || null;
+  }
+}
+
+async function loadShootTasksForToday() {
+  try {
+    const res = await fetch('/api/shoot-tasks-today');
+    const shootTasks = await res.json();
+    if (!shootTasks.length) return;
+    // Add to tasks display in Today view
+    const el = document.getElementById('sp-panel');
+    if (!el) return;
+    const existing = el.innerHTML;
+    let html = '<div class="section-lbl">Shoot tasks due today</div>';
+    html += shootTasks.map(t => '<div class="task"><div class="check p1" onclick="toggleShootTaskFromToday(' + t.id + ')"></div><div class="task-body"><div class="task-title">' + t.title + '</div><div class="task-meta"><span class="tag tag-work">shoot</span><span class="tag">' + (t.shoot_name || '') + '</span></div></div></div>').join('');
+    el.innerHTML = html + existing;
+  } catch(e) { console.log('Shoot tasks today error', e); }
+}
+
+async function toggleShootTaskFromToday(taskId) {
+  await fetch('/api/shoot-tasks/' + taskId + '/complete', { method: 'PATCH' });
+  loadShootTasksForToday();
 }
 
 function showCalendarView() {

@@ -32,6 +32,17 @@ async function initDB() {
   // Add time_block column if it doesn't exist (for existing DBs)
   await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time_block VARCHAR(20) DEFAULT NULL`);
   await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS shoot_tasks (
+    id SERIAL PRIMARY KEY,
+    shoot_id VARCHAR(100) NOT NULL,
+    shoot_name TEXT,
+    title TEXT NOT NULL,
+    done BOOLEAN DEFAULT false,
+    completed_at TIMESTAMP,
+    due_date DATE,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+  )`);
   console.log('DB ready');
 }
 
@@ -250,6 +261,84 @@ app.post("/api/tasks/reorder", async (req, res) => {
     }
     res.json({ success: true });
   } catch(err) { res.status(500).json({ error: err.message }); }
+});
+
+
+const DEFAULT_SHOOT_TASKS = [
+  'Pencil Studio',
+  'Pencil Stylists',
+  'Pencil Assistant',
+  'Confirm shoot dates with client',
+  'Receive brief / PPM notes',
+  'Write shot list',
+  'Props sourced',
+  'Products received',
+  'Confirm Studio, Stylists and Assistants',
+  'Deliver Brief to Stylists',
+  'Images backed up',
+  'Retouch Images',
+  'Client approval on selects',
+  'Deliver Images',
+  'Purchase Order received',
+  'Invoice Client'
+];
+
+app.get("/api/shoot-tasks/:shootId", async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM shoot_tasks WHERE shoot_id = $1 ORDER BY sort_order ASC, id ASC',
+      [req.params.shootId]
+    );
+    res.json(result.rows);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+app.post("/api/shoot-tasks/:shootId/generate", async (req, res) => {
+  const { shootName } = req.body;
+  try {
+    // Check if tasks already exist
+    const existing = await pool.query('SELECT id FROM shoot_tasks WHERE shoot_id = $1', [req.params.shootId]);
+    if (existing.rows.length > 0) return res.json({ skipped: true, message: 'Tasks already exist' });
+    // Insert default tasks
+    for (let i = 0; i < DEFAULT_SHOOT_TASKS.length; i++) {
+      await pool.query(
+        'INSERT INTO shoot_tasks (shoot_id, shoot_name, title, sort_order) VALUES ($1, $2, $3, $4)',
+        [req.params.shootId, shootName, DEFAULT_SHOOT_TASKS[i], i]
+      );
+    }
+    const result = await pool.query('SELECT * FROM shoot_tasks WHERE shoot_id = $1 ORDER BY sort_order ASC', [req.params.shootId]);
+    res.json(result.rows);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+app.patch("/api/shoot-tasks/:id/complete", async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE shoot_tasks SET done = NOT done, completed_at = CASE WHEN done THEN NULL ELSE NOW() END WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+app.patch("/api/shoot-tasks/:id", async (req, res) => {
+  const { due_date } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE shoot_tasks SET due_date = $1 WHERE id = $2 RETURNING *',
+      [due_date || null, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+app.get("/api/shoot-tasks-today", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM shoot_tasks WHERE done = false AND due_date = CURRENT_DATE ORDER BY sort_order ASC"
+    );
+    res.json(result.rows);
+  } catch(err) { res.status(500).json({error: err.message}); }
 });
 
 const PORT = process.env.PORT || 3000;
