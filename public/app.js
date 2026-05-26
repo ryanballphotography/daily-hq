@@ -1293,7 +1293,7 @@ function shootTaskHTML(t, shootId) {
     '<div class="shoot-task-title' + (t.done ? ' done' : '') + '">' + t.title + '</div>' +
     (t.due_date ? '<div class="task-date" style="font-size:11px;margin-top:2px;">' + formatDate(t.due_date) + '</div>' : '') +
     '</div>' +
-    '<input type="date" class="shoot-task-date" value="' + (t.due_date ? t.due_date.split('T')[0] : '') + '" onchange="setShootTaskDate(' + t.id + ',this.value,"' + shootId + '")" title="Set due date" />' +
+    '<input type="date" class="shoot-task-date" value="' + (t.due_date ? t.due_date.split('T')[0] : '') + '" onchange="setShootTaskDate(' + t.id + ',this.value,this.dataset.shootid)" data-shootid="' + shootId + '" title="Set due date" />' +
     '</div>';
 }
 
@@ -1352,6 +1352,7 @@ async function generateShootTasks(shootId, shootName) {
 }
 
 async function setShootTaskDate(taskId, date, shootId) {
+  if (!shootId && event && event.target) shootId = event.target.dataset.shootid;
   await fetch('/api/shoot-tasks/' + taskId, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

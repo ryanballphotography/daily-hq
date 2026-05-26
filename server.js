@@ -198,20 +198,6 @@ app.get("/api/gmail-summary", async (req, res) => {
 });
 
 
-app.get("/api/gmail-summary", async (req, res) => {
-  try {
-    const taskRes = await pool.query("SELECT title FROM tasks WHERE done = false");
-    const taskTitles = taskRes.rows.map(r => r.title).join('||');
-    const reset = req.query.reset ? "&reset=1" : "";
-    const url = "https://shoot-planner.ryanballphotography.com/api/gmail-summary?tasks=" + encodeURIComponent(taskTitles) + reset;
-    const response = await fetch(url, {
-      headers: { "x-api-key": process.env.DAILY_HQ_SECRET }
-    });
-    const data = await response.json();
-    res.json(data);
-  } catch(err) { res.status(500).json({error: err.message}); }
-});
-
 
 app.post("/api/gmail-skip", async (req, res) => {
   try {
