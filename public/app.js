@@ -1285,8 +1285,8 @@ async function renderShoots() {
 }
 
 function shootTaskHTML(t, shootId) {
-  return '<div class="shoot-task" id="shoot-task-' + t.id + '">' +
-    '<div class="check' + (t.done ? ' checked' : '') + '" onclick="toggleShootTask(' + t.id + ',\"' + shootId + '\")">' +
+  return '<div class="shoot-task" id="shoot-task-' + t.id + '" data-shootid="' + shootId + '">' +
+    '<div class="check' + (t.done ? ' checked' : '') + '" onclick="toggleShootTask(' + t.id + ',this.closest(\'.shoot-card\').dataset.shootid)">' +
     (t.done ? '<i class="ti ti-check"></i>' : '') +
     '</div>' +
     '<div class="shoot-task-body">' +
