@@ -1243,7 +1243,7 @@ async function renderShoots() {
       const urgent = daysUntil <= 3;
 
       html += '<div class="shoot-card" id="shoot-card-' + shoot.id + '">';
-      html += '<div class="shoot-card-header" onclick="toggleShootTasks(' + JSON.stringify(shoot.id) + ')">';
+      html += '<div class="shoot-card-header" onclick="toggleShootTasks(\"' + shoot.id + '\")">'; 
       html += '<div class="shoot-card-info">';
       html += '<div class="shoot-card-name">' + shoot.name + '</div>';
       html += '<div class="shoot-card-meta">';
