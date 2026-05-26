@@ -1229,7 +1229,6 @@ async function renderShoots() {
 
     let html = '';
     for (const shoot of shoots) {
-      // Load tasks for this shoot
       const taskRes = await fetch('/api/shoot-tasks/' + shoot.id);
       const shootTasks = await taskRes.json();
       shootTasksCache[shoot.id] = shootTasks;
@@ -1237,65 +1236,89 @@ async function renderShoots() {
       const done = shootTasks.filter(t => t.done).length;
       const total = shootTasks.length;
       const pct = total ? Math.round((done / total) * 100) : 0;
-
       const daysUntil = Math.ceil((new Date(shoot.startDate) - new Date()) / 86400000);
       const daysLabel = daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : 'In ' + daysUntil + ' days';
       const urgent = daysUntil <= 3;
 
-      html += '<div class="shoot-card" id="shoot-card-' + shoot.id + '">';
-      html += '<div class="shoot-card-header" onclick="toggleShootTasks(\"' + shoot.id + '\")">'; 
+      html += '<div class="shoot-card" data-shoot-id="' + shoot.id + '">';
+      html += '<div class="shoot-card-header">';
       html += '<div class="shoot-card-info">';
       html += '<div class="shoot-card-name">' + shoot.name + '</div>';
       html += '<div class="shoot-card-meta">';
       html += '<span class="tag tag-work">' + shoot.status + '</span>';
       html += '<span class="task-date' + (urgent ? ' overdue' : '') + '">' + shoot.startDate + ' · ' + daysLabel + '</span>';
       if (shoot.location) html += '<span class="tag">' + shoot.location + '</span>';
-      html += '</div>';
-      html += '</div>';
+      html += '</div></div>';
       html += '<div class="shoot-card-progress">';
       if (total > 0) {
         html += '<div class="shoot-progress-bar"><div class="shoot-progress-fill" style="width:' + pct + '%"></div></div>';
         html += '<div class="shoot-progress-label">' + done + '/' + total + '</div>';
       }
       html += '<i class="ti ti-chevron-down shoot-chevron" id="chevron-' + shoot.id + '"></i>';
-      html += '</div>';
-      html += '</div>';
+      html += '</div></div>';
 
-      // Task list (hidden by default)
       html += '<div class="shoot-tasks hidden" id="shoot-tasks-' + shoot.id + '">';
       if (total === 0) {
         html += '<div style="padding:1rem;text-align:center;">';
         html += '<div style="font-size:13px;color:var(--text3);margin-bottom:0.75rem;">No tasks yet for this shoot</div>';
-        html += '<button onclick="generateShootTasks(' + JSON.stringify(shoot.id) + ',' + JSON.stringify(shoot.name) + ')" style="font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text3);">Regenerate tasks</button>';
-        html += '<button onclick="generateShootTasks(' + JSON.stringify(shoot.id) + ',' + JSON.stringify(shoot.name) + ')" class="btn-add" style="font-size:12px;">Generate standard tasks</button>';
+        html += '<button class="btn-add generate-tasks-btn" style="font-size:12px;" data-shoot-id="' + shoot.id + '" data-shoot-name="' + shoot.name.replace(/"/g, '') + '">Generate standard tasks</button>';
+        html += '</div>';
       } else {
         html += shootTasks.map(t => shootTaskHTML(t, shoot.id)).join('');
         html += '<div style="padding:0.5rem 1rem 0.75rem;">';
-        html += '<button onclick="generateShootTasks(' + JSON.stringify(shoot.id) + ',' + JSON.stringify(shoot.name) + ')" style="font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text3);">Regenerate tasks</button>';
+        html += '<button class="generate-tasks-btn" style="font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text3);" data-shoot-id="' + shoot.id + '" data-shoot-name="' + shoot.name.replace(/"/g, '') + '">Regenerate tasks</button>';
         html += '</div>';
       }
-      html += '</div>';
-      html += '</div>';
+      html += '</div></div>';
     }
     el.innerHTML = html;
+
+    // Attach event listeners after render
+    el.querySelectorAll('.shoot-card-header').forEach(header => {
+      header.addEventListener('click', () => {
+        const shootId = header.closest('.shoot-card').dataset.shootId;
+        toggleShootTasks(shootId);
+      });
+    });
+    el.querySelectorAll('.generate-tasks-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        generateShootTasks(btn.dataset.shootId, btn.dataset.shootName);
+      });
+    });
+    el.querySelectorAll('.shoot-task-toggle').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        toggleShootTask(parseInt(btn.dataset.taskId), btn.dataset.shootId);
+      });
+    });
+    el.querySelectorAll('.shoot-task-date').forEach(input => {
+      input.addEventListener('change', e => {
+        setShootTaskDate(parseInt(input.dataset.taskId), input.value, input.dataset.shootId);
+      });
+    });
+
   } catch(e) {
     el.innerHTML = '<div class="empty">Could not load shoots.</div>';
     console.error('Shoots error:', e);
   }
 }
 
+
 function shootTaskHTML(t, shootId) {
-  return '<div class="shoot-task" id="shoot-task-' + t.id + '" data-shootid="' + shootId + '">' +
-    '<div class="check' + (t.done ? ' checked' : '') + '" onclick="toggleShootTask(' + t.id + ',this.closest(\'.shoot-card\').dataset.shootid)">' +
+  return '<div class="shoot-task" id="shoot-task-' + t.id + '">' +
+    '<div class="check shoot-task-toggle' + (t.done ? ' checked' : '') + '" data-task-id="' + t.id + '" data-shoot-id="' + shootId + '">' +
     (t.done ? '<i class="ti ti-check"></i>' : '') +
     '</div>' +
     '<div class="shoot-task-body">' +
     '<div class="shoot-task-title' + (t.done ? ' done' : '') + '">' + t.title + '</div>' +
     (t.due_date ? '<div class="task-date" style="font-size:11px;margin-top:2px;">' + formatDate(t.due_date) + '</div>' : '') +
     '</div>' +
-    '<input type="date" class="shoot-task-date" value="' + (t.due_date ? t.due_date.split('T')[0] : '') + '" onchange="setShootTaskDate(' + t.id + ',this.value,this.dataset.shootid)" data-shootid="' + shootId + '" title="Set due date" />' +
+    '<input type="date" class="shoot-task-date" value="' + (t.due_date ? t.due_date.split('T')[0] : '') + '" data-task-id="' + t.id + '" data-shoot-id="' + shootId + '" title="Set due date" />' +
     '</div>';
 }
+
+
 
 function toggleShootTasks(shootId) {
   const tasks = document.getElementById('shoot-tasks-' + shootId);
