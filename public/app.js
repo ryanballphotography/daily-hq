@@ -170,13 +170,15 @@ function getWeekBounds(offsetWeeks = 0) {
 function makeSection(label, tasks, collapsed = false) {
   if (!tasks.length) return '';
   const id = 'section-' + label.toLowerCase().replace(/[^a-z]/g, '');
-  return '<div class="section-header" onclick="toggleSection(\"' + id + '\")">' +
+  const chevronIcon = collapsed ? 'right' : 'down';
+  let html = '<div class="section-header collapsible-header" data-target="' + id + '">' +
     '<span class="section-lbl" style="margin:0;">' + label + ' <span style="color:var(--text3);font-weight:400;">(' + tasks.length + ')</span></span>' +
-    '<i class="ti ti-chevron-' + (collapsed ? 'right' : 'down') + '" style="font-size:13px;color:var(--text3);" id="chevron-' + id + '"></i>' +
-    '</div>' +
-    '<div id="' + id + '"' + (collapsed ? ' class="hidden"' : '') + '>' +
-    tasks.map(taskHTML).join('') +
+    '<i class="ti ti-chevron-' + chevronIcon + '" style="font-size:13px;color:var(--text3);" id="chevron-' + id + '"></i>' +
     '</div>';
+  html += '<div id="' + id + '"' + (collapsed ? ' class="hidden"' : '') + '>';
+  html += tasks.map(taskHTML).join('');
+  html += '</div>';
+  return html;
 }
 
 function toggleSection(id) {
@@ -223,6 +225,10 @@ function renderToday() {
   if (undated.length) html += makeSection('No date', undated, true);
   if (!html) html = '<div class="empty">Nothing on your plate. Add a task or enjoy the quiet.</div>';
   el.innerHTML = html;
+  // Attach section toggle listeners
+  el.querySelectorAll('.collapsible-header').forEach(header => {
+    header.addEventListener('click', () => toggleSection(header.dataset.target));
+  });
 }
 
 function renderAll() {
