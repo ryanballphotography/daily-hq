@@ -414,3 +414,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .shoot-task-title { font-size: 13px; color: var(--text); }
 .shoot-task-title.done { text-decoration: line-through; color: var(--text3); }
 .shoot-task-date { font-size: 11px; border: 0.5px solid var(--border); border-radius: 4px; padding: 2px 4px; color: var(--text3); background: var(--bg); cursor: pointer; width: 110px; flex-shrink: 0; }
+
+/* ── Collapsible sections ── */
+.section-header { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; margin: 1rem 0 0.25rem; cursor: pointer; border-bottom: 0.5px solid var(--border); }
+.section-header:hover { opacity: 0.8; }
+.section-header .section-lbl { margin: 0; border: none; padding: 0; }

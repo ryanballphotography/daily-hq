@@ -154,30 +154,73 @@ function sortTasks(list) {
   });
 }
 
+function getWeekBounds(offsetWeeks = 0) {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun, 1=Mon...
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  const mon = new Date(now);
+  mon.setDate(now.getDate() + diffToMon + (offsetWeeks * 7));
+  mon.setHours(0,0,0,0);
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  sun.setHours(23,59,59,999);
+  return { start: mon, end: sun };
+}
+
+function makeSection(label, tasks, collapsed = false) {
+  if (!tasks.length) return '';
+  const id = 'section-' + label.toLowerCase().replace(/[^a-z]/g, '');
+  return '<div class="section-header" onclick="toggleSection(\"' + id + '\")">' +
+    '<span class="section-lbl" style="margin:0;">' + label + ' <span style="color:var(--text3);font-weight:400;">(' + tasks.length + ')</span></span>' +
+    '<i class="ti ti-chevron-' + (collapsed ? 'right' : 'down') + '" style="font-size:13px;color:var(--text3);" id="chevron-' + id + '"></i>' +
+    '</div>' +
+    '<div id="' + id + '"' + (collapsed ? ' class="hidden"' : '') + '>' +
+    tasks.map(taskHTML).join('') +
+    '</div>';
+}
+
+function toggleSection(id) {
+  const el = document.getElementById(id);
+  const chevron = document.getElementById('chevron-' + id);
+  if (!el) return;
+  el.classList.toggle('hidden');
+  if (chevron) chevron.className = 'ti ti-chevron-' + (el.classList.contains('hidden') ? 'right' : 'down');
+}
+
 function renderToday() {
   const el = document.getElementById('today-tasks');
   const sorted = sortTasks([...tasks]);
+  const thisWeekBounds = getWeekBounds(0);
+  const nextWeekBounds = getWeekBounds(1);
+
   const overdue = sorted.filter(t => isOverdue(t.due_date));
   const dueToday = sorted.filter(t => isDueToday(t.due_date));
   const p1NoDue = sorted.filter(t => !t.due_date && t.priority === 'p1');
   const thisWeek = sorted.filter(t => {
     if (!t.due_date || isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
-    const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7);
-    return new Date(t.due_date) <= weekEnd;
+    const d = new Date(t.due_date.split('T')[0] + 'T00:00:00');
+    return d >= thisWeekBounds.start && d <= thisWeekBounds.end;
+  });
+  const nextWeek = sorted.filter(t => {
+    if (!t.due_date || isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
+    const d = new Date(t.due_date.split('T')[0] + 'T00:00:00');
+    return d >= nextWeekBounds.start && d <= nextWeekBounds.end;
   });
   const upNext = sorted.filter(t => {
-    if (isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
-    if (!t.due_date && t.priority === 'p1') return false;
-    const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7);
-    if (t.due_date && new Date(t.due_date) <= weekEnd) return false;
-    return true;
-  }).slice(0, 3);
+    if (!t.due_date || isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
+    const d = new Date(t.due_date.split('T')[0] + 'T00:00:00');
+    return d > nextWeekBounds.end;
+  });
+  const undated = sorted.filter(t => !t.due_date && t.priority !== 'p1');
+
   let html = '';
-  if (overdue.length) html += '<div class="section-lbl">Overdue</div>' + overdue.map(taskHTML).join('');
-  if (dueToday.length) html += '<div class="section-lbl">Due today</div>' + dueToday.map(taskHTML).join('');
-  if (p1NoDue.length) html += '<div class="section-lbl">High priority</div>' + p1NoDue.map(taskHTML).join('');
-  if (thisWeek.length) html += '<div class="section-lbl">This week</div>' + thisWeek.map(taskHTML).join('');
-  if (upNext.length) html += '<div class="section-lbl">Up next</div>' + upNext.map(taskHTML).join('');
+  if (overdue.length) html += makeSection('Overdue', overdue, false);
+  if (dueToday.length) html += makeSection('Today', dueToday, false);
+  if (p1NoDue.length) html += makeSection('High priority', p1NoDue, false);
+  if (thisWeek.length) html += makeSection('This week', thisWeek, false);
+  if (nextWeek.length) html += makeSection('Next week', nextWeek, true);
+  if (upNext.length) html += makeSection('Up next', upNext, true);
+  if (undated.length) html += makeSection('No date', undated, true);
   if (!html) html = '<div class="empty">Nothing on your plate. Add a task or enjoy the quiet.</div>';
   el.innerHTML = html;
 }
@@ -385,49 +428,9 @@ async function loadShootPlanner() {
 }
 
 function renderShootPlannerPanel(data) {
+  // Shoots now live in the Shoots tab - nothing to render here
   const el = document.getElementById('sp-panel');
-  if (!el) return;
-  let html = '';
-
-  if (data.shoots && data.shoots.length) {
-    html += '<div class="section-lbl">Upcoming shoots</div>';
-    html += data.shoots.map(s => {
-      const daysUntil = Math.ceil((new Date(s.startDate) - new Date()) / 86400000);
-      const urgent = daysUntil <= 2;
-      return `<div class="task">
-        <div class="check ${urgent ? 'p1' : 'p2'}"></div>
-        <div class="task-body">
-          <div class="task-title">${s.name}</div>
-          <div class="task-meta">
-            <span class="tag tag-work">shoot</span>
-            <span class="tag">${s.startDate}</span>
-            <span class="task-date ${urgent ? 'overdue' : ''}">${daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : 'In ' + daysUntil + ' days'}</span>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  if (data.quotes && data.quotes.length) {
-    html += '<div class="section-lbl">Pending quotes</div>';
-    html += data.quotes.map(q => {
-      const daysOld = Math.floor((new Date() - new Date(q.createdAt)) / 86400000);
-      const stale = daysOld >= 2;
-      return `<div class="task">
-        <div class="check ${stale ? 'p1' : 'p3'}"></div>
-        <div class="task-body">
-          <div class="task-title">${q.name} — ${q.clientName}</div>
-          <div class="task-meta">
-            <span class="tag tag-work">quote</span>
-            <span class="task-date ${stale ? 'overdue' : ''}">${stale ? '⚠ ' : ''}${daysOld === 0 ? 'Created today' : daysOld + ' days old'}</span>
-          </div>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  if (!html) html = '<div class="empty" style="padding:0.5rem 0;font-size:12px;">No upcoming shoots or pending quotes.</div>';
-  el.innerHTML = html;
+  if (el) el.innerHTML = '';
 }
 
 async function generateBriefingWithContext(spData, calEvents) {
