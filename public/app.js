@@ -1593,6 +1593,15 @@ async function loadCrmContacts() {
   } catch(e) { console.log('CRM load error', e); }
 }
 
+function urgencyData(c, now) {
+  const last = c.lastTouchpoint ? new Date(c.lastTouchpoint) : null;
+  const daysSince = last ? Math.floor((now - last) / 86400000) : null;
+  const daysUntil = daysSince !== null ? 90 - daysSince : null;
+  const isOverdue = daysUntil === null || daysUntil < 0;
+  const isSoon    = !isOverdue && daysUntil <= 14;
+  return { daysUntil, isOverdue, isSoon };
+}
+
 function renderMktExisting() {
   const el = document.getElementById('mkt-existing');
   if (!el) return;
@@ -1600,26 +1609,66 @@ function renderMktExisting() {
   const existing = mktContacts.filter(c => c.type === 'existing');
 
   if (!existing.length) {
-    el.innerHTML = '<div class="mkt-pipeline-empty">No existing clients yet. Add the people you\'ve already worked with.</div>';
+    el.innerHTML = '<div class="mkt-pipeline-empty">No existing clients yet.</div>';
     return;
   }
 
-  // Sort: most overdue first
-  const sorted = existing.map(c => {
-    const last = c.lastTouchpoint ? new Date(c.lastTouchpoint) : null;
-    const daysSince = last ? Math.floor((now - last) / 86400000) : 999;
-    const daysUntil = last ? 90 - daysSince : null;
-    return { ...c, daysUntil };
-  }).sort((a, b) => {
-    if (a.daysUntil === null) return 1;
-    if (b.daysUntil === null) return -1;
-    return a.daysUntil - b.daysUntil;
+  // Group by agency/org
+  const groups = {};
+  existing.forEach(c => {
+    const key = c.agency || 'Other';
+    if (!groups[key]) groups[key] = [];
+    const u = urgencyData(c, now);
+    groups[key].push({ ...c, ...u });
   });
 
-  el.innerHTML = sorted.map(c => contactCard(c, now, false)).join('');
+  // Sort groups: worst urgency in group determines group order
+  const groupKeys = Object.keys(groups).sort((a, b) => {
+    const aMin = Math.min(...groups[a].map(c => c.daysUntil ?? -999));
+    const bMin = Math.min(...groups[b].map(c => c.daysUntil ?? -999));
+    return aMin - bMin;
+  });
+
+  el.innerHTML = groupKeys.map(key => {
+    const contacts = groups[key].sort((a, b) => (a.daysUntil ?? -999) - (b.daysUntil ?? -999));
+    const hasOverdue = contacts.some(c => c.isOverdue);
+    const hasSoon    = contacts.some(c => c.isSoon);
+    const groupStatus = hasOverdue ? 'over' : hasSoon ? 'soon' : 'ok';
+
+    const rows = contacts.map(c => {
+      let urgBadge = '';
+      if (c.isOverdue && c.daysUntil !== null) urgBadge = '<span class="mkt-row-urgency mkt-urgency-over">&#9888; ' + Math.abs(c.daysUntil) + 'd overdue</span>';
+      else if (c.isOverdue) urgBadge = '<span class="mkt-row-urgency mkt-urgency-over">&#9888; No date</span>';
+      else if (c.isSoon)   urgBadge = '<span class="mkt-row-urgency mkt-urgency-soon">' + c.daysUntil + 'd</span>';
+      else if (c.daysUntil !== null) urgBadge = '<span class="mkt-row-urgency mkt-urgency-ok">' + c.daysUntil + 'd</span>';
+
+      const influence = c.influence || 'key';
+      const influenceBadge = influence === 'light'
+        ? '<span class="mkt-inf-badge mkt-inf-light">Light touch</span>'
+        : '<span class="mkt-inf-badge mkt-inf-key">Key contact</span>';
+
+      return '<div class="mkt-row' + (c.isOverdue ? ' mkt-row-overdue' : '') + '">'
+        + '<div class="mkt-row-name">' + c.name + '</div>'
+        + '<div class="mkt-row-tags">' + influenceBadge + '</div>'
+        + '<div class="mkt-row-right">'
+        + urgBadge
+        + '<button class="mkt-row-touch" onclick="touchContact(\'' + c.id + '\')" title="Log touchpoint"><i class="ti ti-phone-check"></i></button>'
+        + '<button class="mkt-row-inf" onclick="toggleInfluence(\'' + c.id + '\')" title="Toggle influence"><i class="ti ti-adjustments-horizontal"></i></button>'
+        + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
+        + '</div></div>';
+    }).join('');
+
+    return '<div class="mkt-group' + (hasOverdue ? ' mkt-group-overdue' : '') + '">'
+      + '<div class="mkt-group-header">'
+      + '<span class="mkt-group-name">' + key + '</span>'
+      + '<span class="mkt-group-dot mkt-dot-' + groupStatus + '"></span>'
+      + '</div>'
+      + '<div class="mkt-group-rows">' + rows + '</div>'
+      + '</div>';
+  }).join('');
 }
 
-// ── Shared card renderer ──────────────────────────
+// ── Target card renderer (kanban only) ────────────
 function contactCard(c, now, isTarget) {
   const last = c.lastTouchpoint ? new Date(c.lastTouchpoint) : null;
   const daysSince = last ? Math.floor((now - last) / 86400000) : null;
@@ -1631,32 +1680,30 @@ function contactCard(c, now, isTarget) {
   if (isOverdue)   urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-over">&#9888; ' + Math.abs(daysUntil) + 'd overdue</span>';
   else if (isSoon) urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-soon">' + daysUntil + 'd to next touch</span>';
   else if (daysUntil !== null) urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-ok">' + daysUntil + 'd remaining</span>';
-  else urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-ok">No date set</span>';
+  else             urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-over">&#9888; No date</span>';
 
   const roleLabel = c.role === 'artbuyer' ? 'Art buyer' : 'Creative';
-  const canAdvance = isTarget && (c.stage || 'new') !== 'gosee';
-
-  let actionHtml = '';
-  if (isTarget && canAdvance) {
-    actionHtml = '<button class="mkt-card-advance" onclick="advanceContact(\'' + c.id + '\')"><i class="ti ti-arrow-right"></i> ' + STAGE_NEXT[c.stage || 'new'] + '</button>';
-  }
-  if (!isTarget) {
-    actionHtml = '<button class="mkt-card-advance" onclick="touchContact(\'' + c.id + '\')"><i class="ti ti-phone"></i> Log touchpoint</button>';
-  }
+  const canAdvance = (c.stage || 'new') !== 'gosee';
+  const actionHtml = canAdvance
+    ? '<button class="mkt-card-advance" onclick="advanceContact(\'' + c.id + '\')"><i class="ti ti-arrow-right"></i> ' + STAGE_NEXT[c.stage || 'new'] + '</button>'
+    : '';
 
   return '<div class="mkt-card' + (isOverdue ? ' mkt-card-overdue' : '') + '">'
     + '<div class="mkt-card-name">' + c.name + (c.agency ? ' <span class="mkt-card-agency-inline">' + c.agency + '</span>' : '') + '</div>'
-    + '<div class="mkt-card-meta">'
-    + (isTarget ? '<span class="mkt-role-badge mkt-role-' + (c.role || 'creative') + '">' + roleLabel + '</span>' : '<span class="mkt-role-badge mkt-role-existing">Existing client</span>')
-    + urgencyHtml
-    + '</div>'
+    + '<div class="mkt-card-meta"><span class="mkt-role-badge mkt-role-' + (c.role || 'creative') + '">' + roleLabel + '</span>' + urgencyHtml + '</div>'
     + (c.notes ? '<div class="mkt-card-notes">' + c.notes + '</div>' : '')
-    + '<div class="mkt-card-actions">'
-    + actionHtml
+    + '<div class="mkt-card-actions">' + actionHtml
     + '<div style="display:flex;gap:4px;margin-left:auto;">'
     + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
     + '<button class="mkt-card-icon-btn" onclick="deleteContact(\'' + c.id + '\')" aria-label="Delete"><i class="ti ti-trash"></i></button>'
     + '</div></div></div>';
+}
+function toggleInfluence(id) {
+  const c = mktContacts.find(c => c.id === id);
+  if (!c) return;
+  c.influence = (c.influence === 'light') ? 'key' : 'light';
+  saveContacts();
+  renderMktExisting();
 }
 
 // ── Checklists ────────────────────────────────────
