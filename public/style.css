@@ -419,3 +419,57 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .section-header { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; margin: 1rem 0 0.25rem; cursor: pointer; border-bottom: 0.5px solid var(--border); }
 .section-header:hover { opacity: 0.8; }
 .section-header .section-lbl { margin: 0; border: none; padding: 0; }
+
+/* ══════════════════════════════════════════════════
+   MARKETING TAB
+   ══════════════════════════════════════════════════ */
+
+.mkt-section-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--text3); margin-bottom: 0.6rem; font-weight: 500; }
+.mkt-checklist { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.mkt-check-group { border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg); overflow: hidden; }
+.mkt-check-group-header { display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 13px; font-weight: 500; color: var(--text); border-bottom: 0.5px solid var(--border); background: var(--bg2); }
+.mkt-check-group-header i { font-size: 15px; color: var(--text3); }
+.mkt-check-item { display: flex; align-items: flex-start; gap: 10px; padding: 7px 12px; border-bottom: 0.5px solid var(--border); cursor: pointer; transition: background 0.1s; }
+.mkt-check-item:last-child { border-bottom: none; }
+.mkt-check-item:hover { background: var(--bg2); }
+.mkt-check-item.mkt-done .mkt-check-label { text-decoration: line-through; color: var(--text3); }
+.mkt-check-box { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--border2); flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; font-size: 10px; transition: all 0.15s; }
+.mkt-check-item.mkt-done .mkt-check-box { background: var(--text); border-color: var(--text); color: var(--bg); }
+.mkt-check-label { font-size: 13px; color: var(--text); line-height: 1.4; }
+
+.mkt-pipeline-empty { font-size: 13px; color: var(--text3); padding: 1.5rem 0; text-align: center; }
+.mkt-contact-card { border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg); padding: 10px 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+.mkt-contact-card:hover { background: var(--bg2); }
+.mkt-contact-info { flex: 1; min-width: 0; }
+.mkt-contact-name { font-size: 13px; font-weight: 500; color: var(--text); }
+.mkt-contact-meta { display: flex; gap: 6px; margin-top: 3px; flex-wrap: wrap; align-items: center; }
+.mkt-stage-badge { font-size: 10px; padding: 1px 7px; border-radius: 20px; border: 0.5px solid; font-weight: 500; }
+.mkt-stage-new   { background: var(--bg2); color: var(--text3); border-color: var(--border2); }
+.mkt-stage-card  { background: #EEF5FF; color: #185FA5; border-color: #B8D2F5; }
+.mkt-stage-email { background: #EDFAF3; color: #1B6B43; border-color: #A8DDBE; }
+.mkt-stage-called{ background: #FEF7EC; color: #9A5C00; border-color: #F0D49A; }
+.mkt-stage-gosee { background: #F3EEFF; color: #5A30B0; border-color: #C9B5F0; }
+[data-theme="dark"] .mkt-stage-card  { background: #0C2A4A; color: #7BB8F0; border-color: #1A4A7A; }
+[data-theme="dark"] .mkt-stage-email { background: #0A2A18; color: #6AAD8A; border-color: #1A4A30; }
+[data-theme="dark"] .mkt-stage-called{ background: #2A1800; color: #FFA040; border-color: #4A2800; }
+[data-theme="dark"] .mkt-stage-gosee { background: #1A1040; color: #9A90E0; border-color: #2A1A60; }
+.mkt-due-soon { color: var(--p2); font-size: 11px; font-weight: 500; }
+.mkt-overdue  { color: var(--p1); font-size: 11px; font-weight: 500; }
+.mkt-due-ok   { color: var(--text3); font-size: 11px; }
+.mkt-contact-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.mkt-action-btn { background: none; border: 0.5px solid var(--border2); border-radius: var(--radius); font-size: 11px; padding: 3px 8px; cursor: pointer; color: var(--text2); white-space: nowrap; }
+.mkt-action-btn:hover { background: var(--bg2); color: var(--text); }
+.mkt-action-btn.mkt-advance { background: var(--text); color: var(--bg); border-color: var(--text); }
+.mkt-action-btn.mkt-advance:hover { opacity: 0.85; }
+
+.mkt-rules { margin-top: 1.75rem; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg); overflow: hidden; }
+.mkt-rule { display: flex; gap: 12px; align-items: baseline; padding: 8px 12px; border-bottom: 0.5px solid var(--border); }
+.mkt-rule:last-child { border-bottom: none; }
+.mkt-rule-lbl { font-weight: 500; color: var(--text); min-width: 100px; flex-shrink: 0; font-size: 12px; }
+.mkt-rule-val { color: var(--text2); font-size: 12px; line-height: 1.5; }
+
+@media (max-width: 700px) {
+  .mkt-checklist { grid-template-columns: 1fr; }
+  .mkt-contact-card { flex-wrap: wrap; }
+  .mkt-contact-actions { width: 100%; justify-content: flex-end; margin-top: 4px; }
+}

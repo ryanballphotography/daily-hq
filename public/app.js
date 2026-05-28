@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindChat();
   showInboxPrompt();
   loadInboxCalendar();
+  loadContacts();
 });
 
 function setDate() {
@@ -41,6 +42,7 @@ function bindNav() {
       if (view === 'weekly') renderWeekly();
       if (view === 'conversations') renderConversations();
       if (view === 'shoots') renderShoots();
+      if (view === 'marketing') renderMarketing();
     });
   });
   document.querySelectorAll('.ni.ext').forEach(el => {
@@ -1427,3 +1429,247 @@ function showCalendarView() {
   }
 }
 /* This line intentionally left blank */
+
+
+// ══════════════════════════════════════════════════
+// MARKETING TAB
+// ══════════════════════════════════════════════════
+
+let mktContacts = [];
+let mktCheckState = {};
+
+const MKT_STORAGE_KEY = 'mkt_contacts_v1';
+const MKT_CHECKS_KEY  = 'mkt_checks_v1';
+
+const WEEKLY_CHECKS = [
+  { group: 'Outreach', icon: 'ti-users', items: [
+    { id: 'w1', label: 'Find 1 new target creative or art buyer — add to pipeline' },
+    { id: 'w2', label: 'Follow + engage on 3–5 target accounts (comments, not just likes)' },
+    { id: 'w3', label: 'Send 1 card out or 1 personal email (if card has already landed)' },
+    { id: 'w4', label: 'Make 1 phone call (if email + card are both done for that contact)' },
+  ]},
+  { group: 'Visibility', icon: 'ti-brand-instagram', items: [
+    { id: 'w5', label: 'Queue 1 quality Instagram post for the week' },
+    { id: 'w6', label: 'Plan 2–3 stories (BTS, personal project progress, life)' },
+    { id: 'w7', label: 'Repurpose content across IG + LinkedIn' },
+  ]},
+  { group: 'Plan check', icon: 'ti-calendar', items: [
+    { id: 'w8', label: 'Check 90-day cycle — who is approaching their next touchpoint?' },
+    { id: 'w9', label: 'Update pipeline — who has had card / email / call?' },
+    { id: 'w10', label: 'Flag any contact approaching 90 days since last touch' },
+  ]},
+];
+
+const MONTHLY_CHECKS = [
+  { group: 'EDM', icon: 'ti-mail', items: [
+    { id: 'm1', label: 'Send newsletter to insiders list (minimum every 90 days)' },
+    { id: 'm2', label: 'One topic: personal project update, recent work, travel, or news' },
+    { id: 'm3', label: 'Batch: draft 3–6 EDMs in one session and pre-schedule' },
+    { id: 'm4', label: 'Add 5 new people to your insiders list' },
+  ]},
+  { group: 'Personal project', icon: 'ti-camera', items: [
+    { id: 'm5', label: 'Do at least one shoot or edit session on your personal project' },
+    { id: 'm6', label: 'Share one image or BTS update publicly' },
+    { id: 'm7', label: 'Review release strategy — what stage are you at?' },
+  ]},
+  { group: 'Goals', icon: 'ti-target', items: [
+    { id: 'm8', label: 'Set one marketing goal for the month (cards, calls, go-sees)' },
+    { id: 'm9', label: 'Check website — anything to update or refresh?' },
+    { id: 'm10', label: 'Identify one new target agency or brand to research' },
+  ]},
+];
+
+const STAGE_ORDER  = ['new', 'card', 'email', 'called', 'gosee'];
+const STAGE_LABELS = { new: 'Not contacted', card: 'Card sent', email: 'Email sent', called: 'Called', gosee: 'Go-see booked' };
+const STAGE_NEXT   = { new: 'Send card', card: 'Send email', email: 'Make call', called: 'Book go-see', gosee: '✓ Done' };
+
+function loadContacts() {
+  try { mktContacts = JSON.parse(localStorage.getItem(MKT_STORAGE_KEY)) || []; } catch(e) { mktContacts = []; }
+  try { mktCheckState = JSON.parse(localStorage.getItem(MKT_CHECKS_KEY)) || {}; } catch(e) { mktCheckState = {}; }
+}
+
+function saveContacts() { localStorage.setItem(MKT_STORAGE_KEY, JSON.stringify(mktContacts)); }
+function saveCheckState() { localStorage.setItem(MKT_CHECKS_KEY, JSON.stringify(mktCheckState)); }
+
+function weekKey() {
+  const d = new Date(), jan1 = new Date(d.getFullYear(), 0, 1);
+  const wk = Math.ceil((((d - jan1) / 86400000) + jan1.getDay() + 1) / 7);
+  return d.getFullYear() + '-W' + String(wk).padStart(2,'0');
+}
+function monthKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+
+function isChecked(id, period) {
+  const key = period === 'weekly' ? weekKey() : monthKey();
+  return !!(mktCheckState[key] && mktCheckState[key][id]);
+}
+
+function toggleCheck(id, period) {
+  const key = period === 'weekly' ? weekKey() : monthKey();
+  if (!mktCheckState[key]) mktCheckState[key] = {};
+  mktCheckState[key][id] = !mktCheckState[key][id];
+  saveCheckState();
+  renderMarketing();
+}
+
+function renderMarketing() {
+  renderMktChecklist('mkt-weekly-checks',  WEEKLY_CHECKS,  'weekly');
+  renderMktChecklist('mkt-monthly-checks', MONTHLY_CHECKS, 'monthly');
+  renderMktPipeline();
+}
+
+function renderMktChecklist(elId, groups, period) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = groups.map(group => {
+    const items = group.items.map(item => {
+      const done = isChecked(item.id, period);
+      return `<div class="mkt-check-item${done ? ' mkt-done' : ''}" onclick="toggleCheck('${item.id}','${period}')">
+        <div class="mkt-check-box">${done ? '<i class="ti ti-check"></i>' : ''}</div>
+        <div class="mkt-check-label">${item.label}</div>
+      </div>`;
+    }).join('');
+    return `<div class="mkt-check-group">
+      <div class="mkt-check-group-header"><i class="ti ${group.icon}"></i>${group.group}</div>
+      ${items}
+    </div>`;
+  }).join('');
+}
+
+function renderMktPipeline() {
+  const el = document.getElementById('mkt-pipeline');
+  if (!el) return;
+  if (!mktContacts.length) {
+    el.innerHTML = '<div class="mkt-pipeline-empty">No contacts yet. Add your first target creative or art buyer.</div>';
+    return;
+  }
+  const now = new Date();
+  const sorted = [...mktContacts].map(c => {
+    const last = c.lastTouchpoint ? new Date(c.lastTouchpoint) : null;
+    const daysSince = last ? Math.floor((now - last) / 86400000) : 999;
+    const daysUntil90 = last ? 90 - daysSince : null;
+    return { ...c, daysSince, daysUntil90 };
+  }).sort((a, b) => {
+    if (a.daysUntil90 !== null && b.daysUntil90 !== null) return a.daysUntil90 - b.daysUntil90;
+    if (a.daysUntil90 === null) return 1;
+    if (b.daysUntil90 === null) return -1;
+    return 0;
+  });
+
+  el.innerHTML = sorted.map(c => {
+    const stageClass = 'mkt-stage-' + (c.stage || 'new');
+    const stageLabel = STAGE_LABELS[c.stage] || 'Not contacted';
+    const nextAction = STAGE_NEXT[c.stage] || '';
+    const roleLabel = c.role === 'artbuyer' ? 'Art buyer' : 'Creative';
+    const canAdvance = c.stage !== 'gosee';
+    let dueHtml = '';
+    if (c.daysUntil90 !== null) {
+      if (c.daysUntil90 < 0)        dueHtml = `<span class="mkt-overdue">⚠ Overdue by ${Math.abs(c.daysUntil90)} days</span>`;
+      else if (c.daysUntil90 <= 14) dueHtml = `<span class="mkt-due-soon">Next touch in ${c.daysUntil90} days</span>`;
+      else                          dueHtml = `<span class="mkt-due-ok">Next touch in ${c.daysUntil90} days</span>`;
+    }
+    return `<div class="mkt-contact-card" id="mkt-contact-${c.id}">
+      <div class="mkt-contact-info">
+        <div class="mkt-contact-name">${c.name}${c.agency ? ' <span style="font-weight:400;color:var(--text3);">· ' + c.agency + '</span>' : ''}</div>
+        <div class="mkt-contact-meta">
+          <span class="tag">${roleLabel}</span>
+          <span class="mkt-stage-badge ${stageClass}">${stageLabel}</span>
+          ${dueHtml}
+        </div>
+        ${c.notes ? `<div style="font-size:12px;color:var(--text3);margin-top:4px;">${c.notes}</div>` : ''}
+      </div>
+      <div class="mkt-contact-actions">
+        ${canAdvance ? `<button class="mkt-action-btn mkt-advance" onclick="advanceContact('${c.id}')">${nextAction}</button>` : ''}
+        <button class="mkt-action-btn" onclick="editContact('${c.id}')"><i class="ti ti-pencil"></i></button>
+        <button class="mkt-action-btn" onclick="deleteContact('${c.id}')"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openAddContact() {
+  document.getElementById('contact-modal-title').textContent = 'Add contact';
+  document.getElementById('cm-name').value = '';
+  document.getElementById('cm-role').value = 'creative';
+  document.getElementById('cm-agency').value = '';
+  document.getElementById('cm-notes').value = '';
+  document.getElementById('cm-stage').value = 'new';
+  document.getElementById('cm-last-touch').value = '';
+  document.getElementById('contact-modal-bg').classList.remove('hidden');
+  document.getElementById('contact-modal-bg')._editId = null;
+  setTimeout(() => document.getElementById('cm-name').focus(), 50);
+}
+
+function editContact(id) {
+  const c = mktContacts.find(c => c.id === id);
+  if (!c) return;
+  document.getElementById('contact-modal-title').textContent = 'Edit contact';
+  document.getElementById('cm-name').value = c.name || '';
+  document.getElementById('cm-role').value = c.role || 'creative';
+  document.getElementById('cm-agency').value = c.agency || '';
+  document.getElementById('cm-notes').value = c.notes || '';
+  document.getElementById('cm-stage').value = c.stage || 'new';
+  document.getElementById('cm-last-touch').value = c.lastTouchpoint || '';
+  document.getElementById('contact-modal-bg').classList.remove('hidden');
+  document.getElementById('contact-modal-bg')._editId = id;
+  setTimeout(() => document.getElementById('cm-name').focus(), 50);
+}
+
+function closeContactModal() {
+  document.getElementById('contact-modal-bg').classList.add('hidden');
+}
+
+function saveContact() {
+  const name = document.getElementById('cm-name').value.trim();
+  if (!name) { document.getElementById('cm-name').focus(); return; }
+  const data = {
+    name,
+    role:           document.getElementById('cm-role').value,
+    agency:         document.getElementById('cm-agency').value.trim(),
+    notes:          document.getElementById('cm-notes').value.trim(),
+    stage:          document.getElementById('cm-stage').value,
+    lastTouchpoint: document.getElementById('cm-last-touch').value || null,
+  };
+  const editId = document.getElementById('contact-modal-bg')._editId;
+  if (editId) {
+    const idx = mktContacts.findIndex(c => c.id === editId);
+    if (idx > -1) mktContacts[idx] = { ...mktContacts[idx], ...data };
+  } else {
+    mktContacts.push({ id: 'c' + Date.now(), ...data });
+  }
+  saveContacts();
+  closeContactModal();
+  renderMktPipeline();
+}
+
+function deleteContact(id) {
+  if (!confirm('Remove this contact from your pipeline?')) return;
+  mktContacts = mktContacts.filter(c => c.id !== id);
+  saveContacts();
+  renderMktPipeline();
+}
+
+function advanceContact(id) {
+  const c = mktContacts.find(c => c.id === id);
+  if (!c) return;
+  const idx = STAGE_ORDER.indexOf(c.stage || 'new');
+  if (idx < STAGE_ORDER.length - 1) {
+    c.stage = STAGE_ORDER[idx + 1];
+    c.lastTouchpoint = new Date().toISOString().split('T')[0];
+    saveContacts();
+    renderMktPipeline();
+  }
+}
+
+// Close contact modal on backdrop click
+(function() {
+  document.addEventListener('DOMContentLoaded', () => {
+    const bg = document.getElementById('contact-modal-bg');
+    if (!bg) return;
+    let mousedownOnBg = false;
+    bg.addEventListener('mousedown', e => { mousedownOnBg = e.target === bg; });
+    bg.addEventListener('mouseup',   e => { if (mousedownOnBg && e.target === bg) closeContactModal(); mousedownOnBg = false; });
+  });
+})();

@@ -21,6 +21,7 @@
       <div class="ns">Plan</div>
       <div class="ni" data-view="today"><i class="ti ti-layout-dashboard"></i> Today</div>
       <div class="ni" data-view="shoots"><i class="ti ti-camera"></i> Shoots</div>
+      <div class="ni" data-view="marketing"><i class="ti ti-speakerphone"></i> Marketing</div>
       <div class="ni" data-view="weekly"><i class="ti ti-layout-columns"></i> Weekly</div>
       <div class="ni" data-view="scheduled"><i class="ti ti-list-details"></i> Scheduled</div>
       <div class="ni" data-view="calendar"><i class="ti ti-calendar"></i> Calendar</div>
@@ -97,6 +98,26 @@
           <input type="text" id="conv-search-input" placeholder="Search conversations..." oninput="searchConversations(this.value)" />
         </div>
         <div id="conv-list"></div>
+      </div>
+
+      <!-- Marketing view -->
+      <div class="view hidden" id="view-marketing">
+        <div class="mkt-section-lbl">Every Monday — 90 mins</div>
+        <div class="mkt-checklist" id="mkt-weekly-checks"></div>
+        <div class="mkt-section-lbl" style="margin-top:1.5rem;">Every month</div>
+        <div class="mkt-checklist" id="mkt-monthly-checks"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1.75rem;margin-bottom:0.5rem;">
+          <div class="mkt-section-lbl" style="margin:0;">Client pipeline — 90-day cycle</div>
+          <button class="btn-add" onclick="openAddContact()" style="font-size:12px;padding:4px 10px;"><i class="ti ti-plus"></i> Add contact</button>
+        </div>
+        <div id="mkt-pipeline"></div>
+        <div class="mkt-rules">
+          <div class="mkt-rule"><span class="mkt-rule-lbl">Sequence</span><span class="mkt-rule-val">Creative first → then art buyer. Never reverse.</span></div>
+          <div class="mkt-rule"><span class="mkt-rule-lbl">EDM floor</span><span class="mkt-rule-val">Monthly minimum — 90 days is the absolute limit.</span></div>
+          <div class="mkt-rule"><span class="mkt-rule-lbl">IG quality</span><span class="mkt-rule-val">Only post if it's strong. Never post below standard.</span></div>
+          <div class="mkt-rule"><span class="mkt-rule-lbl">Email tone</span><span class="mkt-rule-val">No "do you have work for me". Cool. No CTA except website.</span></div>
+          <div class="mkt-rule"><span class="mkt-rule-lbl">Signature</span><span class="mkt-rule-val">Phone + URL on every single email, no exceptions.</span></div>
+        </div>
       </div>
 
     </div>
@@ -220,6 +241,7 @@
   <!-- Mobile more sheet -->
   <div class="mobile-more-sheet" id="mobile-more-sheet">
     <div class="mobile-more-item" onclick="mobileNav('shoots',null);toggleMoreSheet()"><i class="ti ti-camera"></i> Shoots</div>
+    <div class="mobile-more-item" onclick="mobileNav('marketing',null);toggleMoreSheet()"><i class="ti ti-speakerphone"></i> Marketing</div>
     <div class="mobile-more-item" onclick="mobileNav('scheduled',null);toggleMoreSheet()"><i class="ti ti-list-details"></i> Scheduled</div>
     <div class="mobile-more-item" onclick="mobileNav('completed',null);toggleMoreSheet()"><i class="ti ti-circle-check"></i> Completed</div>
     <div class="mobile-more-item" onclick="mobileNav('calendar',null);toggleMoreSheet()"><i class="ti ti-calendar"></i> Calendar</div>
@@ -230,5 +252,57 @@
   </div>
 
   <script src="app.js"></script>
+
+  <!-- Contact modal -->
+  <div class="modal-bg hidden" id="contact-modal-bg">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title" id="contact-modal-title">Add contact</div>
+        <div class="modal-actions">
+          <button class="btn-cancel" onclick="closeContactModal()">Cancel</button>
+          <button class="btn-save" onclick="saveContact()">Save</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="modal-row">
+          <div class="modal-field">
+            <label>Name</label>
+            <input type="text" id="cm-name" placeholder="Full name" />
+          </div>
+          <div class="modal-field">
+            <label>Role</label>
+            <select id="cm-role">
+              <option value="creative">Creative (AD/CD)</option>
+              <option value="artbuyer">Art buyer / producer</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label>Agency</label>
+          <input type="text" id="cm-agency" placeholder="Agency or studio name" />
+        </div>
+        <div class="modal-field">
+          <label>Notes</label>
+          <textarea id="cm-notes" placeholder="How you found them, mutual connections, style notes..."></textarea>
+        </div>
+        <div class="modal-row">
+          <div class="modal-field">
+            <label>Stage</label>
+            <select id="cm-stage">
+              <option value="new">New — not contacted</option>
+              <option value="card">Card sent</option>
+              <option value="email">Email sent</option>
+              <option value="called">Called</option>
+              <option value="gosee">Go-see booked</option>
+            </select>
+          </div>
+          <div class="modal-field">
+            <label>Last touchpoint</label>
+            <input type="date" id="cm-last-touch" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
