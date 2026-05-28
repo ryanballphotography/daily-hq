@@ -1636,7 +1636,13 @@ function renderMktExisting() {
   });
 
   el.innerHTML = groupKeys.map(key => {
-    const contacts = groups[key].sort((a, b) => (a.daysUntil ?? -999) - (b.daysUntil ?? -999));
+    const contacts = groups[key].sort((a, b) => {
+      // Key contacts first, then by urgency
+      const aKey = (a.influence || 'key') === 'key' ? 0 : 1;
+      const bKey = (b.influence || 'key') === 'key' ? 0 : 1;
+      if (aKey !== bKey) return aKey - bKey;
+      return (a.daysUntil ?? -999) - (b.daysUntil ?? -999);
+    });
     const hasOverdue = contacts.some(c => c.isOverdue);
     const hasSoon    = contacts.some(c => c.isSoon);
     const groupStatus = hasOverdue ? 'over' : hasSoon ? 'soon' : 'ok';
