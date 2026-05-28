@@ -1439,8 +1439,7 @@ function showCalendarView() {
 let mktContacts   = [];
 let mktCheckState = {};
 let mktActiveTab  = 'targets';
-const MKT_STORAGE_KEY = 'mkt_contacts_v1';
-const MKT_CHECKS_KEY  = 'mkt_checks_v1';
+const MKT_CHECKS_KEY = 'mkt_checks_v1';
 
 const STAGES = [
   { id: 'new',    label: 'Not contacted', icon: 'ti-user-plus'    },
@@ -1487,22 +1486,59 @@ const MONTHLY_CHECKS = [
   ]},
 ];
 
-// ── Storage ───────────────────────────────────────
-function loadContacts() {
-  try { mktContacts   = JSON.parse(localStorage.getItem(MKT_STORAGE_KEY)) || []; } catch(e) { mktContacts = []; }
-  // Remove stale CRM contacts so they get refreshed
-  mktContacts = mktContacts.filter(c => !c.fromCrm);
-  try { mktCheckState = JSON.parse(localStorage.getItem(MKT_CHECKS_KEY))  || {}; } catch(e) { mktCheckState = {}; }
-  loadCrmContacts();
+// ── DB-backed storage ─────────────────────────────
+async function loadContacts() {
+  try {
+    const res = await fetch('/api/marketing-contacts');
+    mktContacts = await res.json();
+  } catch(e) { mktContacts = []; }
+  try { mktCheckState = JSON.parse(localStorage.getItem(MKT_CHECKS_KEY)) || {}; } catch(e) { mktCheckState = {}; }
   const bg = document.getElementById('contact-modal-bg');
   if (bg) {
     let md = false;
     bg.addEventListener('mousedown', e => { md = e.target === bg; });
     bg.addEventListener('mouseup',   e => { if (md && e.target === bg) closeContactModal(); md = false; });
   }
+  await loadCrmContacts();
 }
-function saveContacts()   { localStorage.setItem(MKT_STORAGE_KEY, JSON.stringify(mktContacts)); }
-function saveCheckState() { localStorage.setItem(MKT_CHECKS_KEY,  JSON.stringify(mktCheckState)); }
+
+async function upsertContact(c) {
+  await fetch('/api/marketing-contacts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      id:              c.id,
+      type:            c.type || 'target',
+      name:            c.name,
+      role:            c.role || null,
+      agency:          c.agency || null,
+      org_type:        c.org_type || c.orgType || null,
+      crm_id:          c.crm_id || c.crmId || null,
+      notes:           c.notes || null,
+      stage:           c.stage || 'new',
+      last_touchpoint: c.last_touchpoint || c.lastTouchpoint || null,
+      influence:       c.influence || 'key',
+      from_crm:        c.from_crm !== undefined ? c.from_crm : (c.fromCrm || false),
+    })
+  });
+}
+
+async function patchContact(id, fields) {
+  const colMap = { lastTouchpoint: 'last_touchpoint', fromCrm: 'from_crm', orgType: 'org_type', crmId: 'crm_id' };
+  const body = {};
+  Object.keys(fields).forEach(k => { body[colMap[k] || k] = fields[k]; });
+  await fetch('/api/marketing-contacts/' + id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+}
+
+async function removeContact(id) {
+  await fetch('/api/marketing-contacts/' + id, { method: 'DELETE' });
+}
+
+function saveCheckState() { localStorage.setItem(MKT_CHECKS_KEY, JSON.stringify(mktCheckState)); }
 
 function weekKey() {
   const d = new Date(), jan1 = new Date(d.getFullYear(), 0, 1);
@@ -1535,7 +1571,6 @@ function switchMktTab(tab, btn) {
     const el = document.getElementById('mkt-panel-' + p);
     if (el) el.classList.toggle('hidden', p !== tab);
   });
-  // Show/hide add button
   const addBtn = document.getElementById('mkt-add-btn');
   if (addBtn) addBtn.style.display = tab === 'checklist' ? 'none' : '';
   if (tab === 'targets') renderMktKanban();
@@ -1543,23 +1578,21 @@ function switchMktTab(tab, btn) {
   else { renderMktChecklists(); updateMktAccCounts(); }
 }
 
-// ── Main render ───────────────────────────────────
 function renderMarketing() {
   renderMktKanban();
   renderMktChecklists();
   updateMktAccCounts();
 }
 
-// ── Kanban (new targets) ──────────────────────────
+// ── Kanban ────────────────────────────────────────
 function renderMktKanban() {
   const el = document.getElementById('mkt-kanban');
   if (!el) return;
   const now = new Date();
   const targets = mktContacts.filter(c => (c.type || 'target') === 'target');
-
   el.innerHTML = STAGES.map(stage => {
     const contacts = targets.filter(c => (c.stage || 'new') === stage.id);
-    const cards = contacts.length ? contacts.map(c => contactCard(c, now, true)).join('') : '<div class="mkt-col-empty">No contacts</div>';
+    const cards = contacts.length ? contacts.map(c => targetCard(c, now)).join('') : '<div class="mkt-col-empty">No contacts</div>';
     return '<div class="mkt-col mkt-col-' + stage.id + '">'
       + '<div class="mkt-col-header"><i class="ti ' + stage.icon + '" aria-hidden="true"></i><span>' + stage.label + '</span>'
       + (contacts.length ? '<span class="mkt-col-count">' + contacts.length + '</span>' : '')
@@ -1567,47 +1600,33 @@ function renderMktKanban() {
   }).join('');
 }
 
-// ── Existing clients list ─────────────────────────
-async function loadCrmContacts() {
-  try {
-    const res = await fetch('/api/crm-contacts');
-    const orgs = await res.json();
-    orgs.forEach(org => {
-      org.contacts.forEach(c => {
-        const saved = mktContacts.find(m => m.crmId === c.id);
-        if (saved) {
-          // Update CRM fields but preserve locally saved fields
-          saved.name    = c.name;
-          saved.agency  = org.orgName;
-          saved.orgType = org.orgType;
-          saved.email   = c.email;
-          saved.phone   = c.phone;
-          saved.fromCrm = true;
-          // Keep: saved.influence, saved.lastTouchpoint, saved.notes
-        } else {
-          mktContacts.push({
-            id: 'crm_' + c.id,
-            crmId: c.id,
-            type: 'existing',
-            name: c.name,
-            agency: org.orgName,
-            orgType: org.orgType,
-            role: c.role,
-            email: c.email,
-            phone: c.phone,
-            notes: c.notes,
-            lastTouchpoint: null,
-            influence: 'key',
-            fromCrm: true,
-          });
-        }
-      });
-    });
-    saveContacts();
-    if (mktActiveTab === 'existing') renderMktExisting();
-  } catch(e) { console.log('CRM load error', e); }
+function targetCard(c, now) {
+  const last = c.last_touchpoint || c.lastTouchpoint;
+  const lastDate = last ? new Date(last) : null;
+  const daysSince = lastDate ? Math.floor((now - lastDate) / 86400000) : null;
+  const daysUntil = daysSince !== null ? 90 - daysSince : null;
+  const isOverdue = daysUntil !== null && daysUntil < 0;
+  const isSoon    = daysUntil !== null && daysUntil >= 0 && daysUntil <= 14;
+  let urg = '';
+  if (isOverdue)    urg = '<span class="mkt-card-urgency mkt-urgency-over">🔴 ' + Math.abs(daysUntil) + 'd overdue</span>';
+  else if (isSoon)  urg = '<span class="mkt-card-urgency mkt-urgency-soon">🟡 ' + daysUntil + 'd left</span>';
+  else if (daysUntil !== null) urg = '<span class="mkt-card-urgency mkt-urgency-ok">🟢 ' + daysUntil + 'd left</span>';
+  else              urg = '<span class="mkt-card-urgency mkt-urgency-none">No date yet</span>';
+  const roleLabel = c.role === 'artbuyer' ? 'Art buyer' : 'Creative';
+  const canAdvance = (c.stage || 'new') !== 'gosee';
+  const adv = canAdvance ? '<button class="mkt-card-advance" onclick="advanceContact(\'' + c.id + '\')"><i class="ti ti-arrow-right"></i> ' + STAGE_NEXT[c.stage || 'new'] + '</button>' : '';
+  return '<div class="mkt-card' + (isOverdue ? ' mkt-card-overdue' : '') + '">'
+    + '<div class="mkt-card-name">' + c.name + (c.agency ? ' <span class="mkt-card-agency-inline">' + c.agency + '</span>' : '') + '</div>'
+    + '<div class="mkt-card-meta"><span class="mkt-role-badge mkt-role-' + (c.role || 'creative') + '">' + roleLabel + '</span>' + urg + '</div>'
+    + (c.notes ? '<div class="mkt-card-notes">' + c.notes + '</div>' : '')
+    + '<div class="mkt-card-actions">' + adv
+    + '<div style="display:flex;gap:4px;margin-left:auto;">'
+    + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
+    + '<button class="mkt-card-icon-btn" onclick="deleteContact(\'' + c.id + '\')" aria-label="Delete"><i class="ti ti-trash"></i></button>'
+    + '</div></div></div>';
 }
 
+// ── Existing clients ──────────────────────────────
 function urgencyData(c, now) {
   const last = c.last_touchpoint || c.lastTouchpoint;
   const lastDate = last ? new Date(last) : null;
@@ -1624,105 +1643,50 @@ function renderMktExisting() {
   if (!el) return;
   const now = new Date();
   const existing = mktContacts.filter(c => c.type === 'existing');
-
   if (!existing.length) {
     el.innerHTML = '<div class="mkt-pipeline-empty">Loading clients from your shoot planner CRM...</div>';
     return;
   }
-
-  // Group by agency
   const groups = {};
   existing.forEach(c => {
     const key = c.agency || 'Other';
     if (!groups[key]) groups[key] = [];
-    const u = urgencyData(c, now);
-    groups[key].push({ ...c, ...u });
+    groups[key].push({ ...c, ...urgencyData(c, now) });
   });
-
-  // Sort groups: overdue first, then soon, then ok — ignore noDate contacts for group ordering
   const groupKeys = Object.keys(groups).sort((a, b) => {
-    const score = cs => {
-      if (cs.some(c => c.isOverdue)) return 0;
-      if (cs.some(c => c.isSoon))    return 1;
-      return 2;
-    };
+    const score = cs => cs.some(c => c.isOverdue) ? 0 : cs.some(c => c.isSoon) ? 1 : 2;
     return score(groups[a]) - score(groups[b]);
   });
-
   el.innerHTML = groupKeys.map(key => {
     const contacts = groups[key].sort((a, b) => {
-      // ⭐ Key contacts before light touch
       const aKey = (a.influence || 'key') === 'key' ? 0 : 1;
       const bKey = (b.influence || 'key') === 'key' ? 0 : 1;
       if (aKey !== bKey) return aKey - bKey;
-      // Then overdue, soon, ok, no date
       const urgScore = c => c.isOverdue ? 0 : c.isSoon ? 1 : c.noDate ? 3 : 2;
       return urgScore(a) - urgScore(b);
     });
-
     const hasOverdue = contacts.some(c => c.isOverdue);
     const hasSoon    = contacts.some(c => c.isSoon);
     const groupEmoji = hasOverdue ? '🔴' : hasSoon ? '🟡' : '🟢';
-
     const rows = contacts.map(c => {
-      const isKey   = (c.influence || 'key') === 'key';
-      const emoji   = isKey ? '⭐' : '·';
-
-      let urgHtml = '';
-      if (c.isOverdue)  urgHtml = '<span class="mkt-row-urgency mkt-urgency-over">🔴 ' + Math.abs(c.daysUntil) + 'd overdue</span>';
-      else if (c.isSoon) urgHtml = '<span class="mkt-row-urgency mkt-urgency-soon">🟡 ' + c.daysUntil + 'd left</span>';
-      else if (!c.noDate) urgHtml = '<span class="mkt-row-urgency mkt-urgency-ok">🟢 ' + c.daysUntil + 'd left</span>';
-      else               urgHtml = '<span class="mkt-row-urgency mkt-urgency-none">— log first touch</span>';
-
+      const isKey = (c.influence || 'key') === 'key';
+      let urg = '';
+      if (c.isOverdue)     urg = '<span class="mkt-row-urgency mkt-urgency-over">🔴 ' + Math.abs(c.daysUntil) + 'd overdue</span>';
+      else if (c.isSoon)   urg = '<span class="mkt-row-urgency mkt-urgency-soon">🟡 ' + c.daysUntil + 'd left</span>';
+      else if (!c.noDate)  urg = '<span class="mkt-row-urgency mkt-urgency-ok">🟢 ' + c.daysUntil + 'd left</span>';
+      else                 urg = '<span class="mkt-row-urgency mkt-urgency-none">— log first touch</span>';
       return '<div class="mkt-row' + (c.isOverdue ? ' mkt-row-overdue' : '') + (isKey ? '' : ' mkt-row-light') + '">'
-        + '<div class="mkt-row-emoji">' + emoji + '</div>'
+        + '<div class="mkt-row-emoji">' + (isKey ? '⭐' : '·') + '</div>'
         + '<div class="mkt-row-name' + (isKey ? '' : ' mkt-row-name-light') + '">' + c.name + '</div>'
-        + '<div class="mkt-row-right">'
-        + urgHtml
+        + '<div class="mkt-row-right">' + urg
         + '<button class="mkt-row-touch" onclick="touchContact(\'' + c.id + '\')" title="Log touchpoint">📞</button>'
         + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
         + '</div></div>';
     }).join('');
-
     return '<div class="mkt-group">'
-      + '<div class="mkt-group-header">'
-      + '<span class="mkt-group-emoji">' + groupEmoji + '</span>'
-      + '<span class="mkt-group-name">' + key + '</span>'
-      + '</div>'
-      + '<div class="mkt-group-rows">' + rows + '</div>'
-      + '</div>';
+      + '<div class="mkt-group-header"><span class="mkt-group-emoji">' + groupEmoji + '</span><span class="mkt-group-name">' + key + '</span></div>'
+      + '<div class="mkt-group-rows">' + rows + '</div></div>';
   }).join('');
-}
-
-// ── Target card renderer (kanban only) ────────────
-function contactCard(c, now, isTarget) {
-  const last = c.lastTouchpoint ? new Date(c.lastTouchpoint) : null;
-  const daysSince = last ? Math.floor((now - last) / 86400000) : null;
-  const daysUntil = daysSince !== null ? 90 - daysSince : null;
-  const isOverdue = daysUntil !== null && daysUntil < 0;
-  const isSoon    = daysUntil !== null && daysUntil >= 0 && daysUntil <= 14;
-
-  let urgencyHtml = '';
-  if (isOverdue)   urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-over">&#9888; ' + Math.abs(daysUntil) + 'd overdue</span>';
-  else if (isSoon) urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-soon">' + daysUntil + 'd to next touch</span>';
-  else if (daysUntil !== null) urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-ok">' + daysUntil + 'd remaining</span>';
-  else             urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-over">&#9888; No date</span>';
-
-  const roleLabel = c.role === 'artbuyer' ? 'Art buyer' : 'Creative';
-  const canAdvance = (c.stage || 'new') !== 'gosee';
-  const actionHtml = canAdvance
-    ? '<button class="mkt-card-advance" onclick="advanceContact(\'' + c.id + '\')"><i class="ti ti-arrow-right"></i> ' + STAGE_NEXT[c.stage || 'new'] + '</button>'
-    : '';
-
-  return '<div class="mkt-card' + (isOverdue ? ' mkt-card-overdue' : '') + '">'
-    + '<div class="mkt-card-name">' + c.name + (c.agency ? ' <span class="mkt-card-agency-inline">' + c.agency + '</span>' : '') + '</div>'
-    + '<div class="mkt-card-meta"><span class="mkt-role-badge mkt-role-' + (c.role || 'creative') + '">' + roleLabel + '</span>' + urgencyHtml + '</div>'
-    + (c.notes ? '<div class="mkt-card-notes">' + c.notes + '</div>' : '')
-    + '<div class="mkt-card-actions">' + actionHtml
-    + '<div style="display:flex;gap:4px;margin-left:auto;">'
-    + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
-    + '<button class="mkt-card-icon-btn" onclick="deleteContact(\'' + c.id + '\')" aria-label="Delete"><i class="ti ti-trash"></i></button>'
-    + '</div></div></div>';
 }
 
 // ── Checklists ────────────────────────────────────
@@ -1740,9 +1704,7 @@ function renderMktChecklist(elId, groups, period) {
         + '<div class="mkt-check-box">' + (done ? '<i class="ti ti-check"></i>' : '') + '</div>'
         + '<div class="mkt-check-label">' + item.label + '</div></div>';
     }).join('');
-    return '<div class="mkt-check-group">'
-      + '<div class="mkt-check-group-header"><i class="ti ' + group.icon + '" aria-hidden="true"></i>' + group.group + '</div>'
-      + items + '</div>';
+    return '<div class="mkt-check-group"><div class="mkt-check-group-header"><i class="ti ' + group.icon + '" aria-hidden="true"></i>' + group.group + '</div>' + items + '</div>';
   }).join('');
 }
 function updateMktAccCounts() {
@@ -1756,22 +1718,53 @@ function updateMktAccCounts() {
   if (mEl) mEl.textContent = mDone + '/' + mTotal;
 }
 
-// ── Accordion ─────────────────────────────────────
-function toggleMktAcc(id) {
-  const body = document.getElementById('mkt-acc-body-' + id);
-  const chev = document.getElementById('mkt-acc-chev-' + id);
-  if (!body) return;
-  body.classList.toggle('hidden');
-  if (chev) chev.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
+// ── CRM sync ──────────────────────────────────────
+async function loadCrmContacts() {
+  try {
+    const res = await fetch('/api/crm-contacts');
+    const orgs = await res.json();
+    for (const org of orgs) {
+      for (const c of org.contacts) {
+        const saved = mktContacts.find(m => m.crm_id === c.id);
+        if (saved) {
+          // Update CRM-sourced fields only — preserve influence + last_touchpoint
+          saved.name   = c.name;
+          saved.agency = org.orgName;
+          await patchContact(saved.id, { name: c.name, agency: org.orgName });
+        } else {
+          const nc = {
+            id:              'crm_' + c.id,
+            crm_id:          c.id,
+            type:            'existing',
+            name:            c.name,
+            agency:          org.orgName,
+            org_type:        org.orgType,
+            role:            c.role || null,
+            notes:           c.notes || null,
+            last_touchpoint: null,
+            influence:       'key',
+            from_crm:        true,
+            stage:           null,
+          };
+          mktContacts.push(nc);
+          await upsertContact(nc);
+        }
+      }
+    }
+    if (mktActiveTab === 'existing') renderMktExisting();
+  } catch(e) { console.log('CRM load error', e); }
 }
 
 // ── Contact modal ─────────────────────────────────
 function toggleContactType() {
   const type = document.getElementById('cm-type').value;
   const isExisting = type === 'existing';
-  document.getElementById('cm-role-field').classList.toggle('hidden', isExisting);
-  document.getElementById('cm-stage-row').classList.toggle('hidden', isExisting);
-  document.getElementById('cm-existing-row').classList.toggle('hidden', !isExisting);
+  const roleField = document.getElementById('cm-role-field');
+  const stageRow  = document.getElementById('cm-stage-row');
+  const existRow  = document.getElementById('cm-existing-row');
+  if (roleField) roleField.classList.toggle('hidden', isExisting);
+  if (stageRow)  stageRow.classList.toggle('hidden', isExisting);
+  if (existRow)  existRow.classList.toggle('hidden', !isExisting);
 }
 
 function openAddContact() {
@@ -1795,15 +1788,17 @@ function editContact(id) {
   const c = mktContacts.find(c => c.id === id);
   if (!c) return;
   document.getElementById('contact-modal-title').textContent = 'Edit contact';
-  document.getElementById('cm-type').value       = c.type || 'target';
-  document.getElementById('cm-name').value       = c.name || '';
-  document.getElementById('cm-role').value       = c.role || 'creative';
-  document.getElementById('cm-agency').value     = c.agency || '';
-  document.getElementById('cm-notes').value      = c.notes || '';
-  document.getElementById('cm-stage').value      = c.stage || 'new';
-  document.getElementById('cm-last-touch').value = c.lastTouchpoint || '';
-  document.getElementById('cm-last-contact').value = c.lastTouchpoint || '';
-  const infEl = document.getElementById('cm-influence'); if (infEl) infEl.value = c.influence || 'key';
+  document.getElementById('cm-type').value   = c.type || 'target';
+  document.getElementById('cm-name').value   = c.name || '';
+  document.getElementById('cm-role').value   = c.role || 'creative';
+  document.getElementById('cm-agency').value = c.agency || '';
+  document.getElementById('cm-notes').value  = c.notes || '';
+  document.getElementById('cm-stage').value  = c.stage || 'new';
+  const lt = (c.last_touchpoint || c.lastTouchpoint || '').toString().split('T')[0];
+  document.getElementById('cm-last-touch').value   = lt;
+  document.getElementById('cm-last-contact').value = lt;
+  const infEl = document.getElementById('cm-influence');
+  if (infEl) infEl.value = c.influence || 'key';
   toggleContactType();
   document.getElementById('contact-modal-bg').classList.remove('hidden');
   document.getElementById('contact-modal-bg')._editId = id;
@@ -1814,63 +1809,70 @@ function closeContactModal() {
   document.getElementById('contact-modal-bg').classList.add('hidden');
 }
 
-function saveContact() {
+async function saveContact() {
   const name = document.getElementById('cm-name').value.trim();
   if (!name) { document.getElementById('cm-name').focus(); return; }
-  const type = document.getElementById('cm-type').value;
+  const type       = document.getElementById('cm-type').value;
   const isExisting = type === 'existing';
-  const lastTouch = isExisting
+  const editId     = document.getElementById('contact-modal-bg')._editId;
+  const lastTouch  = isExisting
     ? document.getElementById('cm-last-contact').value
     : document.getElementById('cm-last-touch').value;
   const infEl = document.getElementById('cm-influence');
+
   const data = {
+    id:              editId || ('m' + Date.now()),
     type,
     name,
-    role:           isExisting ? null : document.getElementById('cm-role').value,
-    agency:         document.getElementById('cm-agency').value.trim(),
-    notes:          document.getElementById('cm-notes').value.trim(),
-    stage:          isExisting ? null : document.getElementById('cm-stage').value,
-    lastTouchpoint: lastTouch || null,
-    influence:      isExisting ? (infEl ? infEl.value : 'key') : null,
+    role:            isExisting ? null : document.getElementById('cm-role').value,
+    agency:          document.getElementById('cm-agency').value.trim(),
+    notes:           document.getElementById('cm-notes').value.trim(),
+    stage:           isExisting ? null : document.getElementById('cm-stage').value,
+    last_touchpoint: lastTouch || null,
+    influence:       isExisting ? (infEl ? infEl.value : 'key') : null,
+    from_crm:        false,
   };
-  const editId = document.getElementById('contact-modal-bg')._editId;
+
   if (editId) {
     const idx = mktContacts.findIndex(c => c.id === editId);
     if (idx > -1) mktContacts[idx] = { ...mktContacts[idx], ...data };
   } else {
-    mktContacts.push({ id: 'c' + Date.now(), ...data });
+    mktContacts.push(data);
   }
-  saveContacts();
+
+  await upsertContact(data);
   closeContactModal();
-  if (isExisting) { switchMktTab('existing', null); }
-  else            { renderMktKanban(); }
+  if (isExisting) renderMktExisting();
+  else renderMktKanban();
 }
 
-function deleteContact(id) {
+async function deleteContact(id) {
   if (!confirm('Remove this contact?')) return;
   mktContacts = mktContacts.filter(c => c.id !== id);
-  saveContacts();
+  await removeContact(id);
   if (mktActiveTab === 'existing') renderMktExisting();
   else renderMktKanban();
 }
 
-function advanceContact(id) {
+async function advanceContact(id) {
   const c = mktContacts.find(c => c.id === id);
   if (!c) return;
   const stageIds = STAGES.map(s => s.id);
   const idx = stageIds.indexOf(c.stage || 'new');
   if (idx < stageIds.length - 1) {
-    c.stage = stageIds[idx + 1];
-    c.lastTouchpoint = new Date().toISOString().split('T')[0];
-    saveContacts();
+    const today    = new Date().toISOString().split('T')[0];
+    c.stage        = stageIds[idx + 1];
+    c.last_touchpoint = today;
+    await patchContact(id, { stage: c.stage, last_touchpoint: today });
     renderMktKanban();
   }
 }
 
-function touchContact(id) {
+async function touchContact(id) {
   const c = mktContacts.find(c => c.id === id);
   if (!c) return;
-  c.lastTouchpoint = new Date().toISOString().split('T')[0];
-  saveContacts();
+  const today = new Date().toISOString().split('T')[0];
+  c.last_touchpoint = today;
+  await patchContact(id, { last_touchpoint: today });
   renderMktExisting();
 }
