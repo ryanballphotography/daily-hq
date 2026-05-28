@@ -43,6 +43,22 @@ async function initDB() {
     sort_order INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT NOW()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS marketing_contacts (
+    id VARCHAR(50) PRIMARY KEY,
+    type VARCHAR(20) DEFAULT 'target',
+    name TEXT NOT NULL,
+    role VARCHAR(50),
+    agency TEXT,
+    org_type VARCHAR(50),
+    crm_id VARCHAR(100),
+    notes TEXT,
+    stage VARCHAR(20) DEFAULT 'new',
+    last_touchpoint DATE,
+    influence VARCHAR(20) DEFAULT 'key',
+    from_crm BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+  )`);
   console.log('DB ready');
 }
 
@@ -335,6 +351,53 @@ app.get("/api/crm-contacts", async (req, res) => {
     });
     const data = await response.json();
     res.json(data);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Marketing contacts ────────────────────────────────────────────────────────
+app.get("/api/marketing-contacts", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM marketing_contacts ORDER BY created_at ASC");
+    res.json(result.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post("/api/marketing-contacts", async (req, res) => {
+  const { id, type, name, role, agency, org_type, crm_id, notes, stage, last_touchpoint, influence, from_crm } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO marketing_contacts (id, type, name, role, agency, org_type, crm_id, notes, stage, last_touchpoint, influence, from_crm)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       ON CONFLICT (id) DO UPDATE SET
+         type=EXCLUDED.type, name=EXCLUDED.name, role=EXCLUDED.role,
+         agency=EXCLUDED.agency, org_type=EXCLUDED.org_type, notes=EXCLUDED.notes,
+         stage=EXCLUDED.stage, last_touchpoint=EXCLUDED.last_touchpoint,
+         influence=EXCLUDED.influence, from_crm=EXCLUDED.from_crm
+       RETURNING *`,
+      [id, type||'target', name, role||null, agency||null, org_type||null, crm_id||null, notes||null, stage||'new', last_touchpoint||null, influence||'key', from_crm||false]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch("/api/marketing-contacts/:id", async (req, res) => {
+  const fields = req.body;
+  const keys = Object.keys(fields);
+  const values = Object.values(fields);
+  const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+  try {
+    const result = await pool.query(
+      `UPDATE marketing_contacts SET ${setClause}, updated_at=NOW() WHERE id = $${keys.length + 1} RETURNING *`,
+      [...values, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete("/api/marketing-contacts/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM marketing_contacts WHERE id = $1", [req.params.id]);
+    res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
