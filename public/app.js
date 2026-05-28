@@ -1490,7 +1490,10 @@ const MONTHLY_CHECKS = [
 // ── Storage ───────────────────────────────────────
 function loadContacts() {
   try { mktContacts   = JSON.parse(localStorage.getItem(MKT_STORAGE_KEY)) || []; } catch(e) { mktContacts = []; }
+  // Remove stale CRM contacts so they get refreshed
+  mktContacts = mktContacts.filter(c => !c.fromCrm);
   try { mktCheckState = JSON.parse(localStorage.getItem(MKT_CHECKS_KEY))  || {}; } catch(e) { mktCheckState = {}; }
+  loadCrmContacts();
   const bg = document.getElementById('contact-modal-bg');
   if (bg) {
     let md = false;
@@ -1559,6 +1562,37 @@ function renderMktKanban() {
 }
 
 // ── Existing clients list ─────────────────────────
+async function loadCrmContacts() {
+  try {
+    const res = await fetch('/api/crm-contacts');
+    const orgs = await res.json();
+    const now = new Date();
+    // Merge CRM contacts into mktContacts without overwriting manually added ones
+    orgs.forEach(org => {
+      org.contacts.forEach(c => {
+        const existing = mktContacts.find(m => m.crmId === c.id);
+        if (!existing) {
+          mktContacts.push({
+            id: 'crm_' + c.id,
+            crmId: c.id,
+            type: 'existing',
+            name: c.name,
+            agency: org.orgName,
+            orgType: org.orgType,
+            role: c.role,
+            email: c.email,
+            phone: c.phone,
+            notes: c.notes,
+            lastTouchpoint: null,
+            fromCrm: true,
+          });
+        }
+      });
+    });
+    saveContacts();
+  } catch(e) { console.log('CRM load error', e); }
+}
+
 function renderMktExisting() {
   const el = document.getElementById('mkt-existing');
   if (!el) return;
