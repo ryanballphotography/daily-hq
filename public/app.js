@@ -1788,10 +1788,14 @@ function editContact(id) {
   const c = mktContacts.find(c => c.id === id);
   if (!c) return;
   document.getElementById('contact-modal-title').textContent = 'Edit contact';
+  const isCrm = !!(c.crm_id || c.crmId);
   document.getElementById('cm-type').value   = c.type || 'target';
   document.getElementById('cm-name').value   = c.name || '';
   document.getElementById('cm-role').value   = c.role || 'creative';
-  document.getElementById('cm-agency').value = c.agency || '';
+  const agencyEl = document.getElementById('cm-agency');
+  agencyEl.value    = c.agency || '';
+  agencyEl.readOnly = isCrm;
+  agencyEl.style.opacity = isCrm ? '0.5' : '1';
   document.getElementById('cm-notes').value  = c.notes || '';
   document.getElementById('cm-stage').value  = c.stage || 'new';
   const lt = (c.last_touchpoint || c.lastTouchpoint || '').toString().split('T')[0];

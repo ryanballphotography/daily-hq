@@ -365,6 +365,7 @@
           <label>Notes</label>
           <textarea id="cm-notes" placeholder="How you know them, style notes, anything useful..."></textarea>
         </div>
+        <!-- Target fields -->
         <div class="modal-row" id="cm-stage-row">
           <div class="modal-field">
             <label>Stage</label>
@@ -381,19 +382,18 @@
             <input type="date" id="cm-last-touch" />
           </div>
         </div>
-        <div class="modal-field hidden" id="cm-existing-row">
-          <div style="display:flex;gap:12px;">
-            <div class="modal-field" style="flex:1;">
-              <label>Last contact date</label>
-              <input type="date" id="cm-last-contact" />
-            </div>
-            <div class="modal-field" style="flex:1;">
-              <label>Influence level</label>
-              <select id="cm-influence">
-                <option value="key">Key contact</option>
-                <option value="light">Light touch</option>
-              </select>
-            </div>
+        <!-- Existing client fields -->
+        <div class="modal-row hidden" id="cm-existing-row">
+          <div class="modal-field" style="flex:1;">
+            <label>Last touchpoint</label>
+            <input type="date" id="cm-last-contact" />
+          </div>
+          <div class="modal-field" style="flex:1;">
+            <label>Influence level</label>
+            <select id="cm-influence">
+              <option value="key">⭐ Key contact</option>
+              <option value="light">· Light touch</option>
+            </select>
           </div>
         </div>
       </div>
