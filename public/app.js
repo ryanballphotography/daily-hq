@@ -1431,35 +1431,36 @@ function showCalendarView() {
 /* This line intentionally left blank */
 
 
+
 // ══════════════════════════════════════════════════
-// MARKETING TAB — kanban pipeline + collapsible checklists
+// MARKETING TAB
 // ══════════════════════════════════════════════════
 
 let mktContacts   = [];
 let mktCheckState = {};
+let mktActiveTab  = 'targets';
 const MKT_STORAGE_KEY = 'mkt_contacts_v1';
 const MKT_CHECKS_KEY  = 'mkt_checks_v1';
 
 const STAGES = [
-  { id: 'new',    label: 'Not contacted', icon: 'ti-user-plus',     color: 'mkt-col-new'    },
-  { id: 'card',   label: 'Card sent',     icon: 'ti-mail-forward',  color: 'mkt-col-card'   },
-  { id: 'email',  label: 'Email sent',    icon: 'ti-send',          color: 'mkt-col-email'  },
-  { id: 'called', label: 'Called',        icon: 'ti-phone',         color: 'mkt-col-called' },
-  { id: 'gosee',  label: 'Go-see',        icon: 'ti-briefcase',     color: 'mkt-col-gosee'  },
+  { id: 'new',    label: 'Not contacted', icon: 'ti-user-plus'    },
+  { id: 'card',   label: 'Card sent',     icon: 'ti-mail-forward' },
+  { id: 'email',  label: 'Email sent',    icon: 'ti-send'         },
+  { id: 'called', label: 'Called',        icon: 'ti-phone'        },
+  { id: 'gosee',  label: 'Go-see',        icon: 'ti-briefcase'    },
 ];
-
-const STAGE_NEXT_LABEL = { new: 'Card sent', card: 'Email sent', email: 'Called', called: 'Go-see' };
+const STAGE_NEXT = { new: 'Card sent', card: 'Email sent', email: 'Called', called: 'Go-see' };
 
 const WEEKLY_CHECKS = [
   { group: 'Outreach', icon: 'ti-users', items: [
     { id: 'w1', label: 'Find 1 new target creative or art buyer — add to pipeline' },
-    { id: 'w2', label: 'Follow + engage on 3–5 target accounts (comments, not just likes)' },
+    { id: 'w2', label: 'Follow + engage on 3-5 target accounts (comments, not just likes)' },
     { id: 'w3', label: 'Send 1 card out or 1 personal email (if card has already landed)' },
     { id: 'w4', label: 'Make 1 phone call (if email + card are both done for that contact)' },
   ]},
   { group: 'Visibility', icon: 'ti-brand-instagram', items: [
     { id: 'w5', label: 'Queue 1 quality Instagram post for the week' },
-    { id: 'w6', label: 'Plan 2–3 stories (BTS, personal project progress, life)' },
+    { id: 'w6', label: 'Plan 2-3 stories (BTS, personal project progress, life)' },
     { id: 'w7', label: 'Repurpose content across IG + LinkedIn' },
   ]},
   { group: 'Plan check', icon: 'ti-calendar', items: [
@@ -1470,29 +1471,26 @@ const WEEKLY_CHECKS = [
 ];
 
 const MONTHLY_CHECKS = [
-  { group: 'EDM', icon: 'ti-mail', items: [
-    { id: 'm1', label: 'Send newsletter to insiders list (minimum every 90 days)' },
+  { group: 'Mailer', icon: 'ti-mail', items: [
+    { id: 'm1', label: 'Send mailer to list (minimum every 90 days)' },
     { id: 'm2', label: 'One topic: personal project update, recent work, travel, or news' },
-    { id: 'm3', label: 'Batch: draft 3–6 EDMs in one session and pre-schedule' },
-    { id: 'm4', label: 'Add 5 new people to your insiders list' },
+    { id: 'm3', label: 'Add 5 new people to your list' },
   ]},
   { group: 'Personal project', icon: 'ti-camera', items: [
-    { id: 'm5', label: 'Do at least one shoot or edit session on your personal project' },
-    { id: 'm6', label: 'Share one image or BTS update publicly' },
-    { id: 'm7', label: 'Review release strategy — what stage are you at?' },
+    { id: 'm4', label: 'Do at least one shoot or edit session on your personal project' },
+    { id: 'm5', label: 'Share one image or BTS update publicly' },
   ]},
   { group: 'Goals', icon: 'ti-target', items: [
-    { id: 'm8', label: 'Set one marketing goal for the month (cards, calls, go-sees)' },
-    { id: 'm9', label: 'Check website — anything to update or refresh?' },
-    { id: 'm10', label: 'Identify one new target agency or brand to research' },
+    { id: 'm6', label: 'Set one marketing goal for the month (cards, calls, go-sees)' },
+    { id: 'm7', label: 'Check website — anything to update or refresh?' },
+    { id: 'm8', label: 'Identify one new target agency or brand to research' },
   ]},
 ];
 
-// ── Storage ──────────────────────────────────────
+// ── Storage ───────────────────────────────────────
 function loadContacts() {
   try { mktContacts   = JSON.parse(localStorage.getItem(MKT_STORAGE_KEY)) || []; } catch(e) { mktContacts = []; }
   try { mktCheckState = JSON.parse(localStorage.getItem(MKT_CHECKS_KEY))  || {}; } catch(e) { mktCheckState = {}; }
-  // Wire contact modal backdrop
   const bg = document.getElementById('contact-modal-bg');
   if (bg) {
     let md = false;
@@ -1525,123 +1523,168 @@ function toggleCheck(id, period) {
   updateMktAccCounts();
 }
 
-// ── Main render ──────────────────────────────────
+// ── Tabs ──────────────────────────────────────────
+function switchMktTab(tab, btn) {
+  mktActiveTab = tab;
+  document.querySelectorAll('.mkt-tab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('mkt-kanban').classList.toggle('hidden', tab !== 'targets');
+  document.getElementById('mkt-existing').classList.toggle('hidden', tab !== 'existing');
+  if (tab === 'targets') renderMktKanban();
+  else renderMktExisting();
+}
+
+// ── Main render ───────────────────────────────────
 function renderMarketing() {
   renderMktKanban();
   renderMktChecklists();
   updateMktAccCounts();
 }
 
-// ── Kanban ───────────────────────────────────────
+// ── Kanban (new targets) ──────────────────────────
 function renderMktKanban() {
   const el = document.getElementById('mkt-kanban');
   if (!el) return;
   const now = new Date();
+  const targets = mktContacts.filter(c => (c.type || 'target') === 'target');
 
   el.innerHTML = STAGES.map(stage => {
-    const contacts = mktContacts.filter(c => (c.stage || 'new') === stage.id);
-
-    const cards = contacts.length
-      ? contacts.map(c => {
-          const last       = c.lastTouchpoint ? new Date(c.lastTouchpoint) : null;
-          const daysSince  = last ? Math.floor((now - last) / 86400000) : null;
-          const daysUntil  = daysSince !== null ? 90 - daysSince : null;
-          const isOverdue  = daysUntil !== null && daysUntil < 0;
-          const isSoon     = daysUntil !== null && daysUntil >= 0 && daysUntil <= 14;
-          const roleLabel  = c.role === 'artbuyer' ? 'Art buyer' : 'Creative';
-          const canAdvance = stage.id !== 'gosee';
-
-          let urgencyBar = '';
-          if (isOverdue)     urgencyBar = '<div class="mkt-card-urgency mkt-urgency-over">⚠ ' + Math.abs(daysUntil) + 'd overdue</div>';
-          else if (isSoon)   urgencyBar = '<div class="mkt-card-urgency mkt-urgency-soon">' + daysUntil + 'd to next touch</div>';
-          else if (daysUntil !== null) urgencyBar = '<div class="mkt-card-urgency mkt-urgency-ok">' + daysUntil + 'd remaining</div>';
-
-          return `<div class="mkt-card${isOverdue ? ' mkt-card-overdue' : ''}">
-            <div class="mkt-card-name">${c.name}</div>
-            ${c.agency ? `<div class="mkt-card-agency">${c.agency}</div>` : ''}
-            <div class="mkt-card-meta">
-              <span class="mkt-role-badge mkt-role-${c.role || 'creative'}">${roleLabel}</span>
-              ${urgencyBar}
-            </div>
-            ${c.notes ? `<div class="mkt-card-notes">${c.notes}</div>` : ''}
-            <div class="mkt-card-actions">
-              ${canAdvance ? `<button class="mkt-card-btn mkt-card-advance" onclick="advanceContact('${c.id}')"><i class="ti ti-arrow-right"></i> ${STAGE_NEXT_LABEL[stage.id]}</button>` : '<span class="mkt-card-done">&#10003; Active</span>'}
-              <div style="display:flex;gap:4px;margin-left:auto;">
-                <button class="mkt-card-icon-btn" onclick="editContact('${c.id}')"><i class="ti ti-pencil"></i></button>
-                <button class="mkt-card-icon-btn" onclick="deleteContact('${c.id}')"><i class="ti ti-trash"></i></button>
-              </div>
-            </div>
-          </div>`;
-        }).join('')
-      : `<div class="mkt-col-empty">No contacts</div>`;
-
-    return `<div class="mkt-col ${stage.color}">
-      <div class="mkt-col-header">
-        <i class="ti ${stage.icon}"></i>
-        <span>${stage.label}</span>
-        <span class="mkt-col-count">${contacts.length || ''}</span>
-      </div>
-      <div class="mkt-col-cards">${cards}</div>
-    </div>`;
+    const contacts = targets.filter(c => (c.stage || 'new') === stage.id);
+    const cards = contacts.length ? contacts.map(c => contactCard(c, now, true)).join('') : '<div class="mkt-col-empty">No contacts</div>';
+    return '<div class="mkt-col mkt-col-' + stage.id + '">'
+      + '<div class="mkt-col-header"><i class="ti ' + stage.icon + '" aria-hidden="true"></i><span>' + stage.label + '</span>'
+      + (contacts.length ? '<span class="mkt-col-count">' + contacts.length + '</span>' : '')
+      + '</div><div class="mkt-col-cards">' + cards + '</div></div>';
   }).join('');
 }
 
-// ── Checklists ───────────────────────────────────
+// ── Existing clients list ─────────────────────────
+function renderMktExisting() {
+  const el = document.getElementById('mkt-existing');
+  if (!el) return;
+  const now = new Date();
+  const existing = mktContacts.filter(c => c.type === 'existing');
+
+  if (!existing.length) {
+    el.innerHTML = '<div class="mkt-pipeline-empty">No existing clients yet. Add the people you\'ve already worked with.</div>';
+    return;
+  }
+
+  // Sort: most overdue first
+  const sorted = existing.map(c => {
+    const last = c.lastTouchpoint ? new Date(c.lastTouchpoint) : null;
+    const daysSince = last ? Math.floor((now - last) / 86400000) : 999;
+    const daysUntil = last ? 90 - daysSince : null;
+    return { ...c, daysUntil };
+  }).sort((a, b) => {
+    if (a.daysUntil === null) return 1;
+    if (b.daysUntil === null) return -1;
+    return a.daysUntil - b.daysUntil;
+  });
+
+  el.innerHTML = sorted.map(c => contactCard(c, now, false)).join('');
+}
+
+// ── Shared card renderer ──────────────────────────
+function contactCard(c, now, isTarget) {
+  const last = c.lastTouchpoint ? new Date(c.lastTouchpoint) : null;
+  const daysSince = last ? Math.floor((now - last) / 86400000) : null;
+  const daysUntil = daysSince !== null ? 90 - daysSince : null;
+  const isOverdue = daysUntil !== null && daysUntil < 0;
+  const isSoon    = daysUntil !== null && daysUntil >= 0 && daysUntil <= 14;
+
+  let urgencyHtml = '';
+  if (isOverdue)   urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-over">&#9888; ' + Math.abs(daysUntil) + 'd overdue</span>';
+  else if (isSoon) urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-soon">' + daysUntil + 'd to next touch</span>';
+  else if (daysUntil !== null) urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-ok">' + daysUntil + 'd remaining</span>';
+  else urgencyHtml = '<span class="mkt-card-urgency mkt-urgency-ok">No date set</span>';
+
+  const roleLabel = c.role === 'artbuyer' ? 'Art buyer' : 'Creative';
+  const canAdvance = isTarget && (c.stage || 'new') !== 'gosee';
+
+  let actionHtml = '';
+  if (isTarget && canAdvance) {
+    actionHtml = '<button class="mkt-card-advance" onclick="advanceContact(\'' + c.id + '\')"><i class="ti ti-arrow-right"></i> ' + STAGE_NEXT[c.stage || 'new'] + '</button>';
+  }
+  if (!isTarget) {
+    actionHtml = '<button class="mkt-card-advance" onclick="touchContact(\'' + c.id + '\')"><i class="ti ti-phone"></i> Log touchpoint</button>';
+  }
+
+  return '<div class="mkt-card' + (isOverdue ? ' mkt-card-overdue' : '') + '">'
+    + '<div class="mkt-card-name">' + c.name + (c.agency ? ' <span class="mkt-card-agency-inline">' + c.agency + '</span>' : '') + '</div>'
+    + '<div class="mkt-card-meta">'
+    + (isTarget ? '<span class="mkt-role-badge mkt-role-' + (c.role || 'creative') + '">' + roleLabel + '</span>' : '<span class="mkt-role-badge mkt-role-existing">Existing client</span>')
+    + urgencyHtml
+    + '</div>'
+    + (c.notes ? '<div class="mkt-card-notes">' + c.notes + '</div>' : '')
+    + '<div class="mkt-card-actions">'
+    + actionHtml
+    + '<div style="display:flex;gap:4px;margin-left:auto;">'
+    + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
+    + '<button class="mkt-card-icon-btn" onclick="deleteContact(\'' + c.id + '\')" aria-label="Delete"><i class="ti ti-trash"></i></button>'
+    + '</div></div></div>';
+}
+
+// ── Checklists ────────────────────────────────────
 function renderMktChecklists() {
   renderMktChecklist('mkt-weekly-checks',  WEEKLY_CHECKS,  'weekly');
   renderMktChecklist('mkt-monthly-checks', MONTHLY_CHECKS, 'monthly');
 }
-
 function renderMktChecklist(elId, groups, period) {
   const el = document.getElementById(elId);
   if (!el) return;
   el.innerHTML = groups.map(group => {
     const items = group.items.map(item => {
       const done = isChecked(item.id, period);
-      return `<div class="mkt-check-item${done ? ' mkt-done' : ''}" onclick="toggleCheck('${item.id}','${period}')">
-        <div class="mkt-check-box">${done ? '<i class="ti ti-check"></i>' : ''}</div>
-        <div class="mkt-check-label">${item.label}</div>
-      </div>`;
+      return '<div class="mkt-check-item' + (done ? ' mkt-done' : '') + '" onclick="toggleCheck(\'' + item.id + '\',\'' + period + '\')">'
+        + '<div class="mkt-check-box">' + (done ? '<i class="ti ti-check"></i>' : '') + '</div>'
+        + '<div class="mkt-check-label">' + item.label + '</div></div>';
     }).join('');
-    return `<div class="mkt-check-group">
-      <div class="mkt-check-group-header"><i class="ti ${group.icon}"></i>${group.group}</div>
-      ${items}
-    </div>`;
+    return '<div class="mkt-check-group">'
+      + '<div class="mkt-check-group-header"><i class="ti ' + group.icon + '" aria-hidden="true"></i>' + group.group + '</div>'
+      + items + '</div>';
   }).join('');
 }
-
 function updateMktAccCounts() {
-  // Weekly
-  const wTotal = WEEKLY_CHECKS.reduce((n, g) => n + g.items.length, 0);
-  const wDone  = WEEKLY_CHECKS.reduce((n, g) => n + g.items.filter(i => isChecked(i.id, 'weekly')).length, 0);
+  const wTotal = WEEKLY_CHECKS.reduce((n,g) => n + g.items.length, 0);
+  const wDone  = WEEKLY_CHECKS.reduce((n,g) => n + g.items.filter(i => isChecked(i.id,'weekly')).length, 0);
   const wEl = document.getElementById('mkt-week-count');
   if (wEl) wEl.textContent = wDone + '/' + wTotal;
-
-  // Monthly
-  const mTotal = MONTHLY_CHECKS.reduce((n, g) => n + g.items.length, 0);
-  const mDone  = MONTHLY_CHECKS.reduce((n, g) => n + g.items.filter(i => isChecked(i.id, 'monthly')).length, 0);
+  const mTotal = MONTHLY_CHECKS.reduce((n,g) => n + g.items.length, 0);
+  const mDone  = MONTHLY_CHECKS.reduce((n,g) => n + g.items.filter(i => isChecked(i.id,'monthly')).length, 0);
   const mEl = document.getElementById('mkt-month-count');
   if (mEl) mEl.textContent = mDone + '/' + mTotal;
 }
 
-// ── Accordion ────────────────────────────────────
+// ── Accordion ─────────────────────────────────────
 function toggleMktAcc(id) {
-  const body  = document.getElementById('mkt-acc-body-' + id);
-  const chev  = document.getElementById('mkt-acc-chev-' + id);
+  const body = document.getElementById('mkt-acc-body-' + id);
+  const chev = document.getElementById('mkt-acc-chev-' + id);
   if (!body) return;
   body.classList.toggle('hidden');
   if (chev) chev.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
 }
 
-// ── Contact CRUD ─────────────────────────────────
+// ── Contact modal ─────────────────────────────────
+function toggleContactType() {
+  const type = document.getElementById('cm-type').value;
+  const isExisting = type === 'existing';
+  document.getElementById('cm-role-field').classList.toggle('hidden', isExisting);
+  document.getElementById('cm-stage-row').classList.toggle('hidden', isExisting);
+  document.getElementById('cm-existing-row').classList.toggle('hidden', !isExisting);
+}
+
 function openAddContact() {
   document.getElementById('contact-modal-title').textContent = 'Add contact';
-  document.getElementById('cm-name').value        = '';
-  document.getElementById('cm-role').value        = 'creative';
-  document.getElementById('cm-agency').value      = '';
-  document.getElementById('cm-notes').value       = '';
-  document.getElementById('cm-stage').value       = 'new';
-  document.getElementById('cm-last-touch').value  = '';
+  document.getElementById('cm-type').value       = 'target';
+  document.getElementById('cm-name').value       = '';
+  document.getElementById('cm-role').value       = 'creative';
+  document.getElementById('cm-agency').value     = '';
+  document.getElementById('cm-notes').value      = '';
+  document.getElementById('cm-stage').value      = 'new';
+  document.getElementById('cm-last-touch').value = '';
+  document.getElementById('cm-last-contact').value = '';
+  toggleContactType();
   document.getElementById('contact-modal-bg').classList.remove('hidden');
   document.getElementById('contact-modal-bg')._editId = null;
   setTimeout(() => document.getElementById('cm-name').focus(), 50);
@@ -1651,12 +1694,15 @@ function editContact(id) {
   const c = mktContacts.find(c => c.id === id);
   if (!c) return;
   document.getElementById('contact-modal-title').textContent = 'Edit contact';
-  document.getElementById('cm-name').value        = c.name || '';
-  document.getElementById('cm-role').value        = c.role || 'creative';
-  document.getElementById('cm-agency').value      = c.agency || '';
-  document.getElementById('cm-notes').value       = c.notes || '';
-  document.getElementById('cm-stage').value       = c.stage || 'new';
-  document.getElementById('cm-last-touch').value  = c.lastTouchpoint || '';
+  document.getElementById('cm-type').value       = c.type || 'target';
+  document.getElementById('cm-name').value       = c.name || '';
+  document.getElementById('cm-role').value       = c.role || 'creative';
+  document.getElementById('cm-agency').value     = c.agency || '';
+  document.getElementById('cm-notes').value      = c.notes || '';
+  document.getElementById('cm-stage').value      = c.stage || 'new';
+  document.getElementById('cm-last-touch').value = c.lastTouchpoint || '';
+  document.getElementById('cm-last-contact').value = c.lastTouchpoint || '';
+  toggleContactType();
   document.getElementById('contact-modal-bg').classList.remove('hidden');
   document.getElementById('contact-modal-bg')._editId = id;
   setTimeout(() => document.getElementById('cm-name').focus(), 50);
@@ -1669,13 +1715,19 @@ function closeContactModal() {
 function saveContact() {
   const name = document.getElementById('cm-name').value.trim();
   if (!name) { document.getElementById('cm-name').focus(); return; }
+  const type = document.getElementById('cm-type').value;
+  const isExisting = type === 'existing';
+  const lastTouch = isExisting
+    ? document.getElementById('cm-last-contact').value
+    : document.getElementById('cm-last-touch').value;
   const data = {
+    type,
     name,
-    role:           document.getElementById('cm-role').value,
+    role:           isExisting ? null : document.getElementById('cm-role').value,
     agency:         document.getElementById('cm-agency').value.trim(),
     notes:          document.getElementById('cm-notes').value.trim(),
-    stage:          document.getElementById('cm-stage').value,
-    lastTouchpoint: document.getElementById('cm-last-touch').value || null,
+    stage:          isExisting ? null : document.getElementById('cm-stage').value,
+    lastTouchpoint: lastTouch || null,
   };
   const editId = document.getElementById('contact-modal-bg')._editId;
   if (editId) {
@@ -1686,14 +1738,16 @@ function saveContact() {
   }
   saveContacts();
   closeContactModal();
-  renderMktKanban();
+  if (isExisting) { switchMktTab('existing', null); }
+  else            { renderMktKanban(); }
 }
 
 function deleteContact(id) {
-  if (!confirm('Remove this contact from your pipeline?')) return;
+  if (!confirm('Remove this contact?')) return;
   mktContacts = mktContacts.filter(c => c.id !== id);
   saveContacts();
-  renderMktKanban();
+  if (mktActiveTab === 'existing') renderMktExisting();
+  else renderMktKanban();
 }
 
 function advanceContact(id) {
@@ -1707,4 +1761,12 @@ function advanceContact(id) {
     saveContacts();
     renderMktKanban();
   }
+}
+
+function touchContact(id) {
+  const c = mktContacts.find(c => c.id === id);
+  if (!c) return;
+  c.lastTouchpoint = new Date().toISOString().split('T')[0];
+  saveContacts();
+  renderMktExisting();
 }
