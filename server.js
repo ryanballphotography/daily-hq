@@ -330,29 +330,11 @@ app.get("/api/shoot-tasks-today", async (req, res) => {
 // ── CRM contacts from shoot planner shared DB ─────────────────────────────────
 app.get("/api/crm-contacts", async (req, res) => {
   try {
-    const result = await pool.query("SELECT value FROM data_store WHERE key = 'main'");
-    if (!result.rows.length) return res.json([]);
-    const data = result.rows[0].value;
-    const relevantTypes = ["Client", "Design Agency"];
-    const orgs = (data.organisations || []).filter(o => relevantTypes.includes(o.type));
-    const orgIds = new Set(orgs.map(o => o.id));
-    const contacts = (data.contacts || []).filter(c => c.orgId && orgIds.has(c.orgId));
-    const out = orgs.map(org => ({
-      orgId: org.id,
-      orgName: org.name,
-      orgType: org.type,
-      contacts: contacts
-        .filter(c => c.orgId === org.id)
-        .map(c => ({
-          id: c.id,
-          name: ((c.firstName || "") + " " + (c.lastName || "")).trim(),
-          email: c.email || null,
-          phone: c.phone || null,
-          role: c.type || null,
-          notes: c.notes || null,
-        }))
-    }));
-    res.json(out);
+    const response = await fetch("https://shoot-planner.ryanballphotography.com/api/crm-summary", {
+      headers: { "x-api-key": process.env.DAILY_HQ_SECRET }
+    });
+    const data = await response.json();
+    res.json(data);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
