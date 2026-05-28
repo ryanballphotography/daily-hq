@@ -783,3 +783,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .mkt-cl-section {}
 .mkt-cl-heading { font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 7px; text-transform: uppercase; letter-spacing: 0.06em; }
 .mkt-cl-heading i { font-size: 15px; color: var(--text3); }
+
+/* ── Existing clients v2 ── */
+.mkt-group-emoji { font-size: 14px; margin-right: 6px; }
+.mkt-row-emoji { font-size: 14px; width: 20px; flex-shrink: 0; }
+.mkt-row-light { opacity: 0.6; }
+.mkt-row-name-light { font-weight: 400; color: var(--text2); }
+.mkt-row-overdue { background: transparent; }
+.mkt-urgency-none { font-size: 11px; color: var(--text3); font-style: italic; }
+.mkt-row-touch { background: none; border: none; cursor: pointer; font-size: 16px; padding: 2px 4px; }
