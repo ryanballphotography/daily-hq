@@ -1432,14 +1432,23 @@ function showCalendarView() {
 
 
 // ══════════════════════════════════════════════════
-// MARKETING TAB
+// MARKETING TAB — kanban pipeline + collapsible checklists
 // ══════════════════════════════════════════════════
 
-let mktContacts = [];
+let mktContacts   = [];
 let mktCheckState = {};
-
 const MKT_STORAGE_KEY = 'mkt_contacts_v1';
 const MKT_CHECKS_KEY  = 'mkt_checks_v1';
+
+const STAGES = [
+  { id: 'new',    label: 'Not contacted', icon: 'ti-user-plus',     color: 'mkt-col-new'    },
+  { id: 'card',   label: 'Card sent',     icon: 'ti-mail-forward',  color: 'mkt-col-card'   },
+  { id: 'email',  label: 'Email sent',    icon: 'ti-send',          color: 'mkt-col-email'  },
+  { id: 'called', label: 'Called',        icon: 'ti-phone',         color: 'mkt-col-called' },
+  { id: 'gosee',  label: 'Go-see',        icon: 'ti-briefcase',     color: 'mkt-col-gosee'  },
+];
+
+const STAGE_NEXT_LABEL = { new: 'Card sent', card: 'Email sent', email: 'Called', called: 'Go-see' };
 
 const WEEKLY_CHECKS = [
   { group: 'Outreach', icon: 'ti-users', items: [
@@ -1479,45 +1488,108 @@ const MONTHLY_CHECKS = [
   ]},
 ];
 
-const STAGE_ORDER  = ['new', 'card', 'email', 'called', 'gosee'];
-const STAGE_LABELS = { new: 'Not contacted', card: 'Card sent', email: 'Email sent', called: 'Called', gosee: 'Go-see booked' };
-const STAGE_NEXT   = { new: 'Send card', card: 'Send email', email: 'Make call', called: 'Book go-see', gosee: '✓ Done' };
-
+// ── Storage ──────────────────────────────────────
 function loadContacts() {
-  try { mktContacts = JSON.parse(localStorage.getItem(MKT_STORAGE_KEY)) || []; } catch(e) { mktContacts = []; }
-  try { mktCheckState = JSON.parse(localStorage.getItem(MKT_CHECKS_KEY)) || {}; } catch(e) { mktCheckState = {}; }
+  try { mktContacts   = JSON.parse(localStorage.getItem(MKT_STORAGE_KEY)) || []; } catch(e) { mktContacts = []; }
+  try { mktCheckState = JSON.parse(localStorage.getItem(MKT_CHECKS_KEY))  || {}; } catch(e) { mktCheckState = {}; }
+  // Wire contact modal backdrop
+  const bg = document.getElementById('contact-modal-bg');
+  if (bg) {
+    let md = false;
+    bg.addEventListener('mousedown', e => { md = e.target === bg; });
+    bg.addEventListener('mouseup',   e => { if (md && e.target === bg) closeContactModal(); md = false; });
+  }
 }
-
-function saveContacts() { localStorage.setItem(MKT_STORAGE_KEY, JSON.stringify(mktContacts)); }
-function saveCheckState() { localStorage.setItem(MKT_CHECKS_KEY, JSON.stringify(mktCheckState)); }
+function saveContacts()   { localStorage.setItem(MKT_STORAGE_KEY, JSON.stringify(mktContacts)); }
+function saveCheckState() { localStorage.setItem(MKT_CHECKS_KEY,  JSON.stringify(mktCheckState)); }
 
 function weekKey() {
   const d = new Date(), jan1 = new Date(d.getFullYear(), 0, 1);
   const wk = Math.ceil((((d - jan1) / 86400000) + jan1.getDay() + 1) / 7);
-  return d.getFullYear() + '-W' + String(wk).padStart(2,'0');
+  return d.getFullYear() + '-W' + String(wk).padStart(2, '0');
 }
 function monthKey() {
   const d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
 }
-
 function isChecked(id, period) {
   const key = period === 'weekly' ? weekKey() : monthKey();
   return !!(mktCheckState[key] && mktCheckState[key][id]);
 }
-
 function toggleCheck(id, period) {
   const key = period === 'weekly' ? weekKey() : monthKey();
   if (!mktCheckState[key]) mktCheckState[key] = {};
   mktCheckState[key][id] = !mktCheckState[key][id];
   saveCheckState();
-  renderMarketing();
+  renderMktChecklists();
+  updateMktAccCounts();
 }
 
+// ── Main render ──────────────────────────────────
 function renderMarketing() {
+  renderMktKanban();
+  renderMktChecklists();
+  updateMktAccCounts();
+}
+
+// ── Kanban ───────────────────────────────────────
+function renderMktKanban() {
+  const el = document.getElementById('mkt-kanban');
+  if (!el) return;
+  const now = new Date();
+
+  el.innerHTML = STAGES.map(stage => {
+    const contacts = mktContacts.filter(c => (c.stage || 'new') === stage.id);
+
+    const cards = contacts.length
+      ? contacts.map(c => {
+          const last       = c.lastTouchpoint ? new Date(c.lastTouchpoint) : null;
+          const daysSince  = last ? Math.floor((now - last) / 86400000) : null;
+          const daysUntil  = daysSince !== null ? 90 - daysSince : null;
+          const isOverdue  = daysUntil !== null && daysUntil < 0;
+          const isSoon     = daysUntil !== null && daysUntil >= 0 && daysUntil <= 14;
+          const roleLabel  = c.role === 'artbuyer' ? 'Art buyer' : 'Creative';
+          const canAdvance = stage.id !== 'gosee';
+
+          let urgencyBar = '';
+          if (isOverdue)     urgencyBar = '<div class="mkt-card-urgency mkt-urgency-over">⚠ ' + Math.abs(daysUntil) + 'd overdue</div>';
+          else if (isSoon)   urgencyBar = '<div class="mkt-card-urgency mkt-urgency-soon">' + daysUntil + 'd to next touch</div>';
+          else if (daysUntil !== null) urgencyBar = '<div class="mkt-card-urgency mkt-urgency-ok">' + daysUntil + 'd remaining</div>';
+
+          return `<div class="mkt-card${isOverdue ? ' mkt-card-overdue' : ''}">
+            <div class="mkt-card-name">${c.name}</div>
+            ${c.agency ? `<div class="mkt-card-agency">${c.agency}</div>` : ''}
+            <div class="mkt-card-meta">
+              <span class="mkt-role-badge mkt-role-${c.role || 'creative'}">${roleLabel}</span>
+              ${urgencyBar}
+            </div>
+            ${c.notes ? `<div class="mkt-card-notes">${c.notes}</div>` : ''}
+            <div class="mkt-card-actions">
+              ${canAdvance ? `<button class="mkt-card-btn mkt-card-advance" onclick="advanceContact('${c.id}')"><i class="ti ti-arrow-right"></i> ${STAGE_NEXT_LABEL[stage.id]}</button>` : '<span class="mkt-card-done">&#10003; Active</span>'}
+              <div style="display:flex;gap:4px;margin-left:auto;">
+                <button class="mkt-card-icon-btn" onclick="editContact('${c.id}')"><i class="ti ti-pencil"></i></button>
+                <button class="mkt-card-icon-btn" onclick="deleteContact('${c.id}')"><i class="ti ti-trash"></i></button>
+              </div>
+            </div>
+          </div>`;
+        }).join('')
+      : `<div class="mkt-col-empty">No contacts</div>`;
+
+    return `<div class="mkt-col ${stage.color}">
+      <div class="mkt-col-header">
+        <i class="ti ${stage.icon}"></i>
+        <span>${stage.label}</span>
+        <span class="mkt-col-count">${contacts.length || ''}</span>
+      </div>
+      <div class="mkt-col-cards">${cards}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Checklists ───────────────────────────────────
+function renderMktChecklists() {
   renderMktChecklist('mkt-weekly-checks',  WEEKLY_CHECKS,  'weekly');
   renderMktChecklist('mkt-monthly-checks', MONTHLY_CHECKS, 'monthly');
-  renderMktPipeline();
 }
 
 function renderMktChecklist(elId, groups, period) {
@@ -1538,65 +1610,38 @@ function renderMktChecklist(elId, groups, period) {
   }).join('');
 }
 
-function renderMktPipeline() {
-  const el = document.getElementById('mkt-pipeline');
-  if (!el) return;
-  if (!mktContacts.length) {
-    el.innerHTML = '<div class="mkt-pipeline-empty">No contacts yet. Add your first target creative or art buyer.</div>';
-    return;
-  }
-  const now = new Date();
-  const sorted = [...mktContacts].map(c => {
-    const last = c.lastTouchpoint ? new Date(c.lastTouchpoint) : null;
-    const daysSince = last ? Math.floor((now - last) / 86400000) : 999;
-    const daysUntil90 = last ? 90 - daysSince : null;
-    return { ...c, daysSince, daysUntil90 };
-  }).sort((a, b) => {
-    if (a.daysUntil90 !== null && b.daysUntil90 !== null) return a.daysUntil90 - b.daysUntil90;
-    if (a.daysUntil90 === null) return 1;
-    if (b.daysUntil90 === null) return -1;
-    return 0;
-  });
+function updateMktAccCounts() {
+  // Weekly
+  const wTotal = WEEKLY_CHECKS.reduce((n, g) => n + g.items.length, 0);
+  const wDone  = WEEKLY_CHECKS.reduce((n, g) => n + g.items.filter(i => isChecked(i.id, 'weekly')).length, 0);
+  const wEl = document.getElementById('mkt-week-count');
+  if (wEl) wEl.textContent = wDone + '/' + wTotal;
 
-  el.innerHTML = sorted.map(c => {
-    const stageClass = 'mkt-stage-' + (c.stage || 'new');
-    const stageLabel = STAGE_LABELS[c.stage] || 'Not contacted';
-    const nextAction = STAGE_NEXT[c.stage] || '';
-    const roleLabel = c.role === 'artbuyer' ? 'Art buyer' : 'Creative';
-    const canAdvance = c.stage !== 'gosee';
-    let dueHtml = '';
-    if (c.daysUntil90 !== null) {
-      if (c.daysUntil90 < 0)        dueHtml = `<span class="mkt-overdue">⚠ Overdue by ${Math.abs(c.daysUntil90)} days</span>`;
-      else if (c.daysUntil90 <= 14) dueHtml = `<span class="mkt-due-soon">Next touch in ${c.daysUntil90} days</span>`;
-      else                          dueHtml = `<span class="mkt-due-ok">Next touch in ${c.daysUntil90} days</span>`;
-    }
-    return `<div class="mkt-contact-card" id="mkt-contact-${c.id}">
-      <div class="mkt-contact-info">
-        <div class="mkt-contact-name">${c.name}${c.agency ? ' <span style="font-weight:400;color:var(--text3);">· ' + c.agency + '</span>' : ''}</div>
-        <div class="mkt-contact-meta">
-          <span class="tag">${roleLabel}</span>
-          <span class="mkt-stage-badge ${stageClass}">${stageLabel}</span>
-          ${dueHtml}
-        </div>
-        ${c.notes ? `<div style="font-size:12px;color:var(--text3);margin-top:4px;">${c.notes}</div>` : ''}
-      </div>
-      <div class="mkt-contact-actions">
-        ${canAdvance ? `<button class="mkt-action-btn mkt-advance" onclick="advanceContact('${c.id}')">${nextAction}</button>` : ''}
-        <button class="mkt-action-btn" onclick="editContact('${c.id}')"><i class="ti ti-pencil"></i></button>
-        <button class="mkt-action-btn" onclick="deleteContact('${c.id}')"><i class="ti ti-trash"></i></button>
-      </div>
-    </div>`;
-  }).join('');
+  // Monthly
+  const mTotal = MONTHLY_CHECKS.reduce((n, g) => n + g.items.length, 0);
+  const mDone  = MONTHLY_CHECKS.reduce((n, g) => n + g.items.filter(i => isChecked(i.id, 'monthly')).length, 0);
+  const mEl = document.getElementById('mkt-month-count');
+  if (mEl) mEl.textContent = mDone + '/' + mTotal;
 }
 
+// ── Accordion ────────────────────────────────────
+function toggleMktAcc(id) {
+  const body  = document.getElementById('mkt-acc-body-' + id);
+  const chev  = document.getElementById('mkt-acc-chev-' + id);
+  if (!body) return;
+  body.classList.toggle('hidden');
+  if (chev) chev.style.transform = body.classList.contains('hidden') ? '' : 'rotate(180deg)';
+}
+
+// ── Contact CRUD ─────────────────────────────────
 function openAddContact() {
   document.getElementById('contact-modal-title').textContent = 'Add contact';
-  document.getElementById('cm-name').value = '';
-  document.getElementById('cm-role').value = 'creative';
-  document.getElementById('cm-agency').value = '';
-  document.getElementById('cm-notes').value = '';
-  document.getElementById('cm-stage').value = 'new';
-  document.getElementById('cm-last-touch').value = '';
+  document.getElementById('cm-name').value        = '';
+  document.getElementById('cm-role').value        = 'creative';
+  document.getElementById('cm-agency').value      = '';
+  document.getElementById('cm-notes').value       = '';
+  document.getElementById('cm-stage').value       = 'new';
+  document.getElementById('cm-last-touch').value  = '';
   document.getElementById('contact-modal-bg').classList.remove('hidden');
   document.getElementById('contact-modal-bg')._editId = null;
   setTimeout(() => document.getElementById('cm-name').focus(), 50);
@@ -1606,12 +1651,12 @@ function editContact(id) {
   const c = mktContacts.find(c => c.id === id);
   if (!c) return;
   document.getElementById('contact-modal-title').textContent = 'Edit contact';
-  document.getElementById('cm-name').value = c.name || '';
-  document.getElementById('cm-role').value = c.role || 'creative';
-  document.getElementById('cm-agency').value = c.agency || '';
-  document.getElementById('cm-notes').value = c.notes || '';
-  document.getElementById('cm-stage').value = c.stage || 'new';
-  document.getElementById('cm-last-touch').value = c.lastTouchpoint || '';
+  document.getElementById('cm-name').value        = c.name || '';
+  document.getElementById('cm-role').value        = c.role || 'creative';
+  document.getElementById('cm-agency').value      = c.agency || '';
+  document.getElementById('cm-notes').value       = c.notes || '';
+  document.getElementById('cm-stage').value       = c.stage || 'new';
+  document.getElementById('cm-last-touch').value  = c.lastTouchpoint || '';
   document.getElementById('contact-modal-bg').classList.remove('hidden');
   document.getElementById('contact-modal-bg')._editId = id;
   setTimeout(() => document.getElementById('cm-name').focus(), 50);
@@ -1641,35 +1686,25 @@ function saveContact() {
   }
   saveContacts();
   closeContactModal();
-  renderMktPipeline();
+  renderMktKanban();
 }
 
 function deleteContact(id) {
   if (!confirm('Remove this contact from your pipeline?')) return;
   mktContacts = mktContacts.filter(c => c.id !== id);
   saveContacts();
-  renderMktPipeline();
+  renderMktKanban();
 }
 
 function advanceContact(id) {
   const c = mktContacts.find(c => c.id === id);
   if (!c) return;
-  const idx = STAGE_ORDER.indexOf(c.stage || 'new');
-  if (idx < STAGE_ORDER.length - 1) {
-    c.stage = STAGE_ORDER[idx + 1];
+  const stageIds = STAGES.map(s => s.id);
+  const idx = stageIds.indexOf(c.stage || 'new');
+  if (idx < stageIds.length - 1) {
+    c.stage = stageIds[idx + 1];
     c.lastTouchpoint = new Date().toISOString().split('T')[0];
     saveContacts();
-    renderMktPipeline();
+    renderMktKanban();
   }
 }
-
-// Close contact modal on backdrop click
-(function() {
-  document.addEventListener('DOMContentLoaded', () => {
-    const bg = document.getElementById('contact-modal-bg');
-    if (!bg) return;
-    let mousedownOnBg = false;
-    bg.addEventListener('mousedown', e => { mousedownOnBg = e.target === bg; });
-    bg.addEventListener('mouseup',   e => { if (mousedownOnBg && e.target === bg) closeContactModal(); mousedownOnBg = false; });
-  });
-})();

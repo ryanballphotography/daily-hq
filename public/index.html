@@ -101,22 +101,70 @@
       </div>
 
       <!-- Marketing view -->
-      <div class="view hidden" id="view-marketing">
-        <div class="mkt-section-lbl">Every Monday — 90 mins</div>
-        <div class="mkt-checklist" id="mkt-weekly-checks"></div>
-        <div class="mkt-section-lbl" style="margin-top:1.5rem;">Every month</div>
-        <div class="mkt-checklist" id="mkt-monthly-checks"></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:1.75rem;margin-bottom:0.5rem;">
-          <div class="mkt-section-lbl" style="margin:0;">Client pipeline — 90-day cycle</div>
-          <button class="btn-add" onclick="openAddContact()" style="font-size:12px;padding:4px 10px;"><i class="ti ti-plus"></i> Add contact</button>
+      <div class="view hidden" id="view-marketing" style="padding:0;display:flex;flex-direction:column;height:calc(100vh - 49px);">
+
+        <!-- Pipeline header -->
+        <div class="mkt-pipeline-header">
+          <div class="mkt-pipeline-title">
+            <span>Client Pipeline</span>
+            <span class="mkt-pipeline-sub">90-day cycle · creatives before art buyers</span>
+          </div>
+          <button class="btn-add" onclick="openAddContact()" style="font-size:12px;padding:5px 12px;flex-shrink:0;"><i class="ti ti-plus"></i> Add contact</button>
         </div>
-        <div id="mkt-pipeline"></div>
-        <div class="mkt-rules">
-          <div class="mkt-rule"><span class="mkt-rule-lbl">Sequence</span><span class="mkt-rule-val">Creative first → then art buyer. Never reverse.</span></div>
-          <div class="mkt-rule"><span class="mkt-rule-lbl">EDM floor</span><span class="mkt-rule-val">Monthly minimum — 90 days is the absolute limit.</span></div>
-          <div class="mkt-rule"><span class="mkt-rule-lbl">IG quality</span><span class="mkt-rule-val">Only post if it's strong. Never post below standard.</span></div>
-          <div class="mkt-rule"><span class="mkt-rule-lbl">Email tone</span><span class="mkt-rule-val">No "do you have work for me". Cool. No CTA except website.</span></div>
-          <div class="mkt-rule"><span class="mkt-rule-lbl">Signature</span><span class="mkt-rule-val">Phone + URL on every single email, no exceptions.</span></div>
+
+        <!-- Kanban board -->
+        <div class="mkt-kanban" id="mkt-kanban"></div>
+
+        <!-- Collapsible checklists -->
+        <div class="mkt-lower">
+
+          <div class="mkt-accordion">
+            <div class="mkt-acc-header" onclick="toggleMktAcc('weekly')">
+              <div class="mkt-acc-left">
+                <i class="ti ti-calendar-week"></i>
+                <span>Monday checklist</span>
+                <span class="mkt-acc-count" id="mkt-week-count"></span>
+              </div>
+              <i class="ti ti-chevron-down mkt-acc-chevron" id="mkt-acc-chev-weekly"></i>
+            </div>
+            <div class="mkt-acc-body hidden" id="mkt-acc-body-weekly">
+              <div class="mkt-checklist" id="mkt-weekly-checks"></div>
+            </div>
+          </div>
+
+          <div class="mkt-accordion">
+            <div class="mkt-acc-header" onclick="toggleMktAcc('monthly')">
+              <div class="mkt-acc-left">
+                <i class="ti ti-calendar-month"></i>
+                <span>Monthly checklist</span>
+                <span class="mkt-acc-count" id="mkt-month-count"></span>
+              </div>
+              <i class="ti ti-chevron-down mkt-acc-chevron" id="mkt-acc-chev-monthly"></i>
+            </div>
+            <div class="mkt-acc-body hidden" id="mkt-acc-body-monthly">
+              <div class="mkt-checklist" id="mkt-monthly-checks"></div>
+            </div>
+          </div>
+
+          <div class="mkt-accordion">
+            <div class="mkt-acc-header" onclick="toggleMktAcc('rules')">
+              <div class="mkt-acc-left">
+                <i class="ti ti-info-circle"></i>
+                <span>Ground rules</span>
+              </div>
+              <i class="ti ti-chevron-down mkt-acc-chevron" id="mkt-acc-chev-rules"></i>
+            </div>
+            <div class="mkt-acc-body hidden" id="mkt-acc-body-rules">
+              <div class="mkt-rules">
+                <div class="mkt-rule"><span class="mkt-rule-lbl">Sequence</span><span class="mkt-rule-val">Creative first &#8594; then art buyer. Never reverse.</span></div>
+                <div class="mkt-rule"><span class="mkt-rule-lbl">EDM floor</span><span class="mkt-rule-val">Monthly minimum &#8212; 90 days is the absolute limit.</span></div>
+                <div class="mkt-rule"><span class="mkt-rule-lbl">IG quality</span><span class="mkt-rule-val">Only post if it's strong. Never post below standard.</span></div>
+                <div class="mkt-rule"><span class="mkt-rule-lbl">Email tone</span><span class="mkt-rule-val">No "do you have work for me". Cool. No CTA except website.</span></div>
+                <div class="mkt-rule"><span class="mkt-rule-lbl">Signature</span><span class="mkt-rule-val">Phone + URL on every single email, no exceptions.</span></div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 

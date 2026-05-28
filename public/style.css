@@ -421,55 +421,227 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .section-header .section-lbl { margin: 0; border: none; padding: 0; }
 
 /* ══════════════════════════════════════════════════
-   MARKETING TAB
+   MARKETING TAB — kanban
    ══════════════════════════════════════════════════ */
 
-.mkt-section-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--text3); margin-bottom: 0.6rem; font-weight: 500; }
+/* Pipeline header */
+.mkt-pipeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 1.25rem;
+  border-bottom: 0.5px solid var(--border);
+  gap: 12px;
+  flex-shrink: 0;
+}
+.mkt-pipeline-title { display: flex; flex-direction: column; gap: 2px; }
+.mkt-pipeline-title span:first-child { font-size: 14px; font-weight: 500; color: var(--text); }
+.mkt-pipeline-sub { font-size: 11px; color: var(--text3); }
+
+/* Kanban board */
+.mkt-kanban {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  overflow-x: auto;
+  border-bottom: 0.5px solid var(--border);
+  min-height: 0;
+}
+.mkt-kanban::-webkit-scrollbar { height: 4px; }
+.mkt-kanban::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* Columns */
+.mkt-col {
+  min-width: 200px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-right: 0.5px solid var(--border);
+  background: var(--bg);
+}
+.mkt-col:last-child { border-right: none; }
+
+.mkt-col-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+  color: var(--text2);
+}
+.mkt-col-header i { font-size: 14px; }
+.mkt-col-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--bg3);
+  color: var(--text3);
+  padding: 1px 6px;
+  border-radius: 20px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* Column accent colours — top border */
+.mkt-col-new    { border-top: 2px solid #999; }
+.mkt-col-card   { border-top: 2px solid #4A90D9; }
+.mkt-col-email  { border-top: 2px solid #3BAA72; }
+.mkt-col-called { border-top: 2px solid #E09A30; }
+.mkt-col-gosee  { border-top: 2px solid #8B6FD4; }
+
+.mkt-col-cards {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mkt-col-cards::-webkit-scrollbar { width: 3px; }
+.mkt-col-cards::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.mkt-col-empty {
+  font-size: 12px;
+  color: var(--text3);
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+  font-style: italic;
+}
+
+/* Contact cards */
+.mkt-card {
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  font-size: 13px;
+  transition: box-shadow 0.15s;
+}
+.mkt-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+.mkt-card.mkt-card-overdue { border-color: var(--p1); }
+
+.mkt-card-name   { font-weight: 500; color: var(--text); margin-bottom: 2px; font-size: 13px; }
+.mkt-card-agency { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+.mkt-card-notes  { font-size: 11px; color: var(--text3); margin: 5px 0; line-height: 1.4; border-top: 0.5px solid var(--border); padding-top: 5px; }
+
+.mkt-card-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+
+.mkt-role-badge { font-size: 10px; padding: 1px 6px; border-radius: 20px; font-weight: 500; }
+.mkt-role-creative { background: #EEF5FF; color: #185FA5; border: 0.5px solid #B8D2F5; }
+.mkt-role-artbuyer { background: #F3EEFF; color: #5A30B0; border: 0.5px solid #C9B5F0; }
+[data-theme="dark"] .mkt-role-creative { background: #0C2A4A; color: #7BB8F0; border-color: #1A4A7A; }
+[data-theme="dark"] .mkt-role-artbuyer { background: #1A1040; color: #9A90E0; border-color: #2A1A60; }
+
+.mkt-card-urgency { font-size: 10px; font-weight: 500; padding: 1px 6px; border-radius: 20px; }
+.mkt-urgency-over { background: #FCEBEB; color: var(--p1); }
+.mkt-urgency-soon { background: #FEF7EC; color: var(--p2); }
+.mkt-urgency-ok   { background: var(--bg3); color: var(--text3); }
+[data-theme="dark"] .mkt-urgency-over { background: #3A0A0A; }
+[data-theme="dark"] .mkt-urgency-soon { background: #2A1800; }
+
+.mkt-card-actions { display: flex; align-items: center; gap: 5px; padding-top: 8px; border-top: 0.5px solid var(--border); }
+
+.mkt-card-advance {
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius);
+  background: var(--text);
+  color: var(--bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.mkt-card-advance:hover { opacity: 0.85; }
+.mkt-card-advance i { font-size: 11px; }
+
+.mkt-card-icon-btn {
+  width: 24px;
+  height: 24px;
+  border: 0.5px solid var(--border2);
+  border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+  color: var(--text3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+.mkt-card-icon-btn:hover { background: var(--bg3); color: var(--text); }
+.mkt-card-done { font-size: 11px; color: var(--text3); }
+
+/* Lower accordions */
+.mkt-lower {
+  flex-shrink: 0;
+  border-top: 0.5px solid var(--border);
+  background: var(--bg);
+}
+
+.mkt-accordion { border-bottom: 0.5px solid var(--border); }
+.mkt-accordion:last-child { border-bottom: none; }
+
+.mkt-acc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 1.25rem;
+  cursor: pointer;
+  user-select: none;
+}
+.mkt-acc-header:hover { background: var(--bg2); }
+
+.mkt-acc-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.mkt-acc-left i { font-size: 15px; color: var(--text3); }
+
+.mkt-acc-count {
+  font-size: 11px;
+  color: var(--text3);
+  font-weight: 400;
+  background: var(--bg3);
+  padding: 1px 7px;
+  border-radius: 20px;
+}
+
+.mkt-acc-chevron { font-size: 14px; color: var(--text3); transition: transform 0.2s; }
+
+.mkt-acc-body { padding: 1rem 1.25rem; background: var(--bg2); }
+
+/* Checklists inside accordions */
 .mkt-checklist { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
 .mkt-check-group { border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg); overflow: hidden; }
-.mkt-check-group-header { display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 13px; font-weight: 500; color: var(--text); border-bottom: 0.5px solid var(--border); background: var(--bg2); }
-.mkt-check-group-header i { font-size: 15px; color: var(--text3); }
-.mkt-check-item { display: flex; align-items: flex-start; gap: 10px; padding: 7px 12px; border-bottom: 0.5px solid var(--border); cursor: pointer; transition: background 0.1s; }
+.mkt-check-group-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12px; font-weight: 500; color: var(--text); border-bottom: 0.5px solid var(--border); }
+.mkt-check-group-header i { font-size: 14px; color: var(--text3); }
+.mkt-check-item { display: flex; align-items: flex-start; gap: 10px; padding: 7px 12px; border-bottom: 0.5px solid var(--border); cursor: pointer; }
 .mkt-check-item:last-child { border-bottom: none; }
 .mkt-check-item:hover { background: var(--bg2); }
 .mkt-check-item.mkt-done .mkt-check-label { text-decoration: line-through; color: var(--text3); }
 .mkt-check-box { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--border2); flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; font-size: 10px; transition: all 0.15s; }
 .mkt-check-item.mkt-done .mkt-check-box { background: var(--text); border-color: var(--text); color: var(--bg); }
-.mkt-check-label { font-size: 13px; color: var(--text); line-height: 1.4; }
+.mkt-check-label { font-size: 12px; color: var(--text); line-height: 1.4; }
 
-.mkt-pipeline-empty { font-size: 13px; color: var(--text3); padding: 1.5rem 0; text-align: center; }
-.mkt-contact-card { border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg); padding: 10px 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
-.mkt-contact-card:hover { background: var(--bg2); }
-.mkt-contact-info { flex: 1; min-width: 0; }
-.mkt-contact-name { font-size: 13px; font-weight: 500; color: var(--text); }
-.mkt-contact-meta { display: flex; gap: 6px; margin-top: 3px; flex-wrap: wrap; align-items: center; }
-.mkt-stage-badge { font-size: 10px; padding: 1px 7px; border-radius: 20px; border: 0.5px solid; font-weight: 500; }
-.mkt-stage-new   { background: var(--bg2); color: var(--text3); border-color: var(--border2); }
-.mkt-stage-card  { background: #EEF5FF; color: #185FA5; border-color: #B8D2F5; }
-.mkt-stage-email { background: #EDFAF3; color: #1B6B43; border-color: #A8DDBE; }
-.mkt-stage-called{ background: #FEF7EC; color: #9A5C00; border-color: #F0D49A; }
-.mkt-stage-gosee { background: #F3EEFF; color: #5A30B0; border-color: #C9B5F0; }
-[data-theme="dark"] .mkt-stage-card  { background: #0C2A4A; color: #7BB8F0; border-color: #1A4A7A; }
-[data-theme="dark"] .mkt-stage-email { background: #0A2A18; color: #6AAD8A; border-color: #1A4A30; }
-[data-theme="dark"] .mkt-stage-called{ background: #2A1800; color: #FFA040; border-color: #4A2800; }
-[data-theme="dark"] .mkt-stage-gosee { background: #1A1040; color: #9A90E0; border-color: #2A1A60; }
-.mkt-due-soon { color: var(--p2); font-size: 11px; font-weight: 500; }
-.mkt-overdue  { color: var(--p1); font-size: 11px; font-weight: 500; }
-.mkt-due-ok   { color: var(--text3); font-size: 11px; }
-.mkt-contact-actions { display: flex; gap: 4px; flex-shrink: 0; }
-.mkt-action-btn { background: none; border: 0.5px solid var(--border2); border-radius: var(--radius); font-size: 11px; padding: 3px 8px; cursor: pointer; color: var(--text2); white-space: nowrap; }
-.mkt-action-btn:hover { background: var(--bg2); color: var(--text); }
-.mkt-action-btn.mkt-advance { background: var(--text); color: var(--bg); border-color: var(--text); }
-.mkt-action-btn.mkt-advance:hover { opacity: 0.85; }
-
-.mkt-rules { margin-top: 1.75rem; border: 0.5px solid var(--border); border-radius: var(--radius); background: var(--bg); overflow: hidden; }
-.mkt-rule { display: flex; gap: 12px; align-items: baseline; padding: 8px 12px; border-bottom: 0.5px solid var(--border); }
+/* Rules */
+.mkt-rules { display: flex; flex-direction: column; gap: 0; border: 0.5px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--bg); }
+.mkt-rule { display: flex; gap: 12px; padding: 8px 12px; border-bottom: 0.5px solid var(--border); font-size: 12px; }
 .mkt-rule:last-child { border-bottom: none; }
-.mkt-rule-lbl { font-weight: 500; color: var(--text); min-width: 100px; flex-shrink: 0; font-size: 12px; }
-.mkt-rule-val { color: var(--text2); font-size: 12px; line-height: 1.5; }
+.mkt-rule-lbl { font-weight: 500; color: var(--text); min-width: 95px; flex-shrink: 0; }
+.mkt-rule-val { color: var(--text2); line-height: 1.5; }
 
+/* Mobile */
 @media (max-width: 700px) {
+  .mkt-kanban { min-height: 280px; }
+  .mkt-col { min-width: 160px; }
   .mkt-checklist { grid-template-columns: 1fr; }
-  .mkt-contact-card { flex-wrap: wrap; }
-  .mkt-contact-actions { width: 100%; justify-content: flex-end; margin-top: 4px; }
 }
