@@ -1531,10 +1531,16 @@ function switchMktTab(tab, btn) {
   mktActiveTab = tab;
   document.querySelectorAll('.mkt-tab').forEach(t => t.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  document.getElementById('mkt-kanban').classList.toggle('hidden', tab !== 'targets');
-  document.getElementById('mkt-existing').classList.toggle('hidden', tab !== 'existing');
+  ['targets','existing','checklist'].forEach(p => {
+    const el = document.getElementById('mkt-panel-' + p);
+    if (el) el.classList.toggle('hidden', p !== tab);
+  });
+  // Show/hide add button
+  const addBtn = document.getElementById('mkt-add-btn');
+  if (addBtn) addBtn.style.display = tab === 'checklist' ? 'none' : '';
   if (tab === 'targets') renderMktKanban();
-  else renderMktExisting();
+  else if (tab === 'existing') renderMktExisting();
+  else { renderMktChecklists(); updateMktAccCounts(); }
 }
 
 // ── Main render ───────────────────────────────────
@@ -1609,7 +1615,7 @@ function renderMktExisting() {
   const existing = mktContacts.filter(c => c.type === 'existing');
 
   if (!existing.length) {
-    el.innerHTML = '<div class="mkt-pipeline-empty">No existing clients yet.</div>';
+    el.innerHTML = '<div class="mkt-pipeline-empty">No existing clients yet. They load automatically from your shoot planner CRM.</div>';
     return;
   }
 
@@ -1653,7 +1659,7 @@ function renderMktExisting() {
         + '<div class="mkt-row-right">'
         + urgBadge
         + '<button class="mkt-row-touch" onclick="touchContact(\'' + c.id + '\')" title="Log touchpoint"><i class="ti ti-phone-check"></i></button>'
-        + '<button class="mkt-row-inf" onclick="toggleInfluence(\'' + c.id + '\')" title="Toggle influence"><i class="ti ti-adjustments-horizontal"></i></button>'
+        
         + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
         + '</div></div>';
     }).join('');
@@ -1697,13 +1703,6 @@ function contactCard(c, now, isTarget) {
     + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
     + '<button class="mkt-card-icon-btn" onclick="deleteContact(\'' + c.id + '\')" aria-label="Delete"><i class="ti ti-trash"></i></button>'
     + '</div></div></div>';
-}
-function toggleInfluence(id) {
-  const c = mktContacts.find(c => c.id === id);
-  if (!c) return;
-  c.influence = (c.influence === 'light') ? 'key' : 'light';
-  saveContacts();
-  renderMktExisting();
 }
 
 // ── Checklists ────────────────────────────────────
@@ -1765,6 +1764,7 @@ function openAddContact() {
   document.getElementById('cm-stage').value      = 'new';
   document.getElementById('cm-last-touch').value = '';
   document.getElementById('cm-last-contact').value = '';
+  const inf = document.getElementById('cm-influence'); if (inf) inf.value = 'key';
   toggleContactType();
   document.getElementById('contact-modal-bg').classList.remove('hidden');
   document.getElementById('contact-modal-bg')._editId = null;
@@ -1783,6 +1783,7 @@ function editContact(id) {
   document.getElementById('cm-stage').value      = c.stage || 'new';
   document.getElementById('cm-last-touch').value = c.lastTouchpoint || '';
   document.getElementById('cm-last-contact').value = c.lastTouchpoint || '';
+  const infEl = document.getElementById('cm-influence'); if (infEl) infEl.value = c.influence || 'key';
   toggleContactType();
   document.getElementById('contact-modal-bg').classList.remove('hidden');
   document.getElementById('contact-modal-bg')._editId = id;
@@ -1801,6 +1802,7 @@ function saveContact() {
   const lastTouch = isExisting
     ? document.getElementById('cm-last-contact').value
     : document.getElementById('cm-last-touch').value;
+  const infEl = document.getElementById('cm-influence');
   const data = {
     type,
     name,
@@ -1809,6 +1811,7 @@ function saveContact() {
     notes:          document.getElementById('cm-notes').value.trim(),
     stage:          isExisting ? null : document.getElementById('cm-stage').value,
     lastTouchpoint: lastTouch || null,
+    influence:      isExisting ? (infEl ? infEl.value : 'key') : null,
   };
   const editId = document.getElementById('contact-modal-bg')._editId;
   if (editId) {
