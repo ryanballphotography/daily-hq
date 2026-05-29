@@ -11,29 +11,213 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejec
 app.use(express.json());
 app.use(cookieParser());
 
+const crypto = require('crypto');
+
+// ── Auth helpers ──────────────────────────────────
+function totp(secret) {
+  // RFC 6238 TOTP — 30s window, 6 digits
+  const epoch = Math.floor(Date.now() / 30000);
+  function hotp(key, counter) {
+    const buf = Buffer.alloc(8);
+    for (let i = 7; i >= 0; i--) { buf[i] = counter & 0xff; counter >>= 8; }
+    const hmac = crypto.createHmac('sha1', Buffer.from(key, 'base32').toString ? base32decode(key) : key);
+    hmac.update(buf);
+    const h = hmac.digest();
+    const o = h[19] & 0xf;
+    return ((h[o] & 0x7f) << 24 | h[o+1] << 16 | h[o+2] << 8 | h[o+3]) % 1000000;
+  }
+  function base32decode(s) {
+    const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    s = s.toUpperCase().replace(/=+$/, '');
+    let bits = 0, val = 0, out = [];
+    for (const c of s) {
+      val = (val << 5) | alpha.indexOf(c);
+      bits += 5;
+      if (bits >= 8) { out.push((val >> (bits - 8)) & 0xff); bits -= 8; }
+    }
+    return Buffer.from(out);
+  }
+  // Accept current window and +-1 for clock drift
+  const code = parseInt(secret);
+  if (!isNaN(code)) return code; // for testing
+  for (const drift of [0, -1, 1]) {
+    if (hotp(secret, epoch + drift).toString().padStart(6,'0') === secret.toString().padStart(6,'0')) return true;
+  }
+  return hotp(secret, epoch).toString().padStart(6,'0');
+}
+
+function verifyTotp(secret, code) {
+  const epoch = Math.floor(Date.now() / 30000);
+  function base32decode(s) {
+    const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    s = s.toUpperCase().replace(/=+$/, '');
+    let bits = 0, val = 0, out = [];
+    for (const c of s) {
+      val = (val << 5) | alpha.indexOf(c);
+      bits += 5;
+      if (bits >= 8) { out.push((val >> (bits - 8)) & 0xff); bits -= 8; }
+    }
+    return Buffer.from(out);
+  }
+  function hotp(key, counter) {
+    const buf = Buffer.alloc(8);
+    for (let i = 7; i >= 0; i--) { buf[i] = counter & 0xff; counter >>= 8; }
+    const hmac = crypto.createHmac('sha1', base32decode(key));
+    hmac.update(buf);
+    const h = hmac.digest();
+    const o = h[19] & 0xf;
+    return ((h[o] & 0x7f) << 24 | h[o+1] << 16 | h[o+2] << 8 | h[o+3]) % 1000000;
+  }
+  const input = parseInt(code);
+  for (const drift of [0, -1, 1]) {
+    if (hotp(secret, epoch + drift) === input) return true;
+  }
+  return false;
+}
+
+function generateToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
 // ── Auth middleware ───────────────────────────────
 async function checkAuth(req, res, next) {
-  // Allow API calls through with their own auth
+  const open = ['/login', '/login/verify', '/login/2fa'];
+  if (open.includes(req.path)) return next();
   if (req.path.startsWith('/api/')) return next();
-  // Check sp_token cookie against shared sessions table
-  const token = req.cookies['sp_token'];
-  if (!token) return res.redirect('https://shoot-planner.ryanballphotography.com/login');
+
+  const token = req.cookies['hq_token'];
+  if (!token) return res.redirect('/login');
   try {
     const result = await pool.query(
-      "SELECT * FROM sessions WHERE token = $1 AND expires_at > NOW()",
+      "SELECT * FROM hq_sessions WHERE token = $1 AND expires_at > NOW()",
       [token]
     );
-    if (!result.rows.length) return res.redirect('https://shoot-planner.ryanballphotography.com/login');
+    if (!result.rows.length) return res.redirect('/login');
     next();
   } catch(e) {
-    // If sessions table doesn't exist yet, allow through
-    console.log('Auth check error:', e.message);
-    next();
+    console.log('Auth error:', e.message);
+    res.redirect('/login');
   }
 }
 
 app.use(checkAuth);
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ── Login routes ──────────────────────────────────
+app.get('/login', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily HQ — Login</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #1a1a1a; border: 0.5px solid #2a2a2a; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; }
+    .logo { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .sub { font-size: 12px; color: #666; margin-bottom: 2rem; }
+    label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #666; display: block; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; background: #111; border: 0.5px solid #2a2a2a; border-radius: 8px; color: #e0e0e0; font-size: 14px; outline: none; margin-bottom: 1rem; }
+    input:focus { border-color: #444; }
+    button { width: 100%; padding: 11px; background: #fff; color: #000; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+    button:hover { opacity: 0.9; }
+    .error { font-size: 13px; color: #e05555; margin-bottom: 1rem; background: #2a1010; padding: 8px 12px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Daily HQ</div>
+    <div class="sub">Ryan Ball Photography</div>
+    ${req.query.error ? '<div class="error">Incorrect username or password</div>' : ''}
+    <form method="POST" action="/login">
+      <div><label>Username</label><input type="text" name="username" autofocus autocomplete="username" /></div>
+      <div><label>Password</label><input type="password" name="password" autocomplete="current-password" /></div>
+      <button type="submit">Continue</button>
+    </form>
+  </div>
+</body>
+</html>`);
+});
+
+app.post('/login', express.urlencoded({ extended: false }), async (req, res) => {
+  const { username, password } = req.body;
+  const validUser = process.env.HQ_USERNAME || 'ryan';
+  const validPass = process.env.HQ_PASSWORD;
+  if (!validPass || username !== validUser || password !== validPass) {
+    return res.redirect('/login?error=1');
+  }
+  // Password correct — issue temp token for 2FA step
+  const tempToken = generateToken();
+  await pool.query(
+    "INSERT INTO hq_sessions (token, expires_at, verified) VALUES ($1, NOW() + INTERVAL '5 minutes', false)",
+    [tempToken]
+  );
+  res.cookie('hq_temp', tempToken, { httpOnly: true, secure: true, maxAge: 300000 });
+  res.redirect('/login/2fa');
+});
+
+app.get('/login/2fa', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily HQ — 2FA</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #1a1a1a; border: 0.5px solid #2a2a2a; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; }
+    .logo { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .sub { font-size: 13px; color: #888; margin-bottom: 2rem; line-height: 1.5; }
+    label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #666; display: block; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; background: #111; border: 0.5px solid #2a2a2a; border-radius: 8px; color: #e0e0e0; font-size: 20px; letter-spacing: .2em; outline: none; margin-bottom: 1rem; text-align: center; }
+    input:focus { border-color: #444; }
+    button { width: 100%; padding: 11px; background: #fff; color: #000; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+    button:hover { opacity: 0.9; }
+    .error { font-size: 13px; color: #e05555; margin-bottom: 1rem; background: #2a1010; padding: 8px 12px; border-radius: 6px; }
+    .back { text-align: center; margin-top: 1rem; font-size: 12px; color: #666; }
+    .back a { color: #888; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Two-factor auth</div>
+    <div class="sub">Enter the 6-digit code from your authenticator app.</div>
+    ${req.query.error ? '<div class="error">Invalid code — try again</div>' : ''}
+    <form method="POST" action="/login/verify">
+      <div><label>Authentication code</label><input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autofocus placeholder="000000" /></div>
+      <button type="submit">Verify</button>
+    </form>
+    <div class="back"><a href="/login">Back to login</a></div>
+  </div>
+</body>
+</html>`);
+});
+
+app.post('/login/verify', express.urlencoded({ extended: false }), async (req, res) => {
+  const tempToken = req.cookies['hq_temp'];
+  if (!tempToken) return res.redirect('/login');
+
+  const { code } = req.body;
+  const secret = process.env.HQ_TOTP_SECRET;
+  if (!secret || !verifyTotp(secret, code)) {
+    return res.redirect('/login/2fa?error=1');
+  }
+
+  // 2FA passed — create real 24h session
+  const sessionToken = generateToken();
+  await pool.query(
+    "INSERT INTO hq_sessions (token, expires_at, verified) VALUES ($1, NOW() + INTERVAL '24 hours', true)",
+    [sessionToken]
+  );
+  // Clean up temp token
+  await pool.query("DELETE FROM hq_sessions WHERE token = $1", [tempToken]);
+
+  res.clearCookie('hq_temp');
+  res.cookie('hq_token', sessionToken, { httpOnly: true, secure: true, maxAge: 86400000 });
+  res.redirect('/');
+});
 
 async function initDB() {
   await pool.query(`
@@ -95,6 +279,15 @@ async function initDB() {
     updated_at TIMESTAMP DEFAULT NOW()
   )`);
   await pool.query(`ALTER TABLE marketing_contacts ADD COLUMN IF NOT EXISTS last_touch_type VARCHAR(20)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS hq_sessions (
+    id SERIAL PRIMARY KEY,
+    token VARCHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    verified BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT NOW()
+  )`);
+  // Clean expired sessions
+  await pool.query("DELETE FROM hq_sessions WHERE expires_at < NOW()");
   console.log('DB ready');
 }
 
