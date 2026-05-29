@@ -3,11 +3,36 @@ const fetch = require('node-fetch');
 const express = require('express');
 const { Pool } = require('pg');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 app.use(express.json());
+app.use(cookieParser());
+
+// ── Auth middleware ───────────────────────────────
+async function checkAuth(req, res, next) {
+  // Allow API calls through with their own auth
+  if (req.path.startsWith('/api/')) return next();
+  // Check sp_token cookie against shared sessions table
+  const token = req.cookies['sp_token'];
+  if (!token) return res.redirect('https://shoot-planner.ryanballphotography.com/login');
+  try {
+    const result = await pool.query(
+      "SELECT * FROM sessions WHERE token = $1 AND expires_at > NOW()",
+      [token]
+    );
+    if (!result.rows.length) return res.redirect('https://shoot-planner.ryanballphotography.com/login');
+    next();
+  } catch(e) {
+    // If sessions table doesn't exist yet, allow through
+    console.log('Auth check error:', e.message);
+    next();
+  }
+}
+
+app.use(checkAuth);
 app.use(express.static(path.join(__dirname, 'public')));
 
 async function initDB() {
