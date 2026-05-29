@@ -991,3 +991,5 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   opacity: 1 !important;
 }
 .mkt-row-right { gap: 8px !important; }
+
+.mkt-touch-type-badge { font-size: 10px; color: var(--text3); background: var(--bg3); padding: 1px 6px; border-radius: 20px; white-space: nowrap; }

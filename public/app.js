@@ -1715,10 +1715,12 @@ function renderMktExisting() {
       else if (c.isSoon)   urg = '<span class="mkt-row-urgency mkt-urgency-soon">🟡 ' + c.daysUntil + 'd left</span>';
       else if (!c.noDate)  urg = '<span class="mkt-row-urgency mkt-urgency-ok">🟢 ' + c.daysUntil + 'd left</span>';
       else                 urg = '<span class="mkt-row-urgency mkt-urgency-none">— log first touch</span>';
+      const touchTypeLabels = { card:'📬 Card', email:'✉️ Email', call:'📞 Call', gosee:'🤝 Go-see', onset:'🎬 On set', social:'💬 IG/LI', mailer:'📧 Mailer' };
+      const touchTypeBadge = c.last_touch_type ? '<span class="mkt-touch-type-badge">' + (touchTypeLabels[c.last_touch_type] || c.last_touch_type) + '</span>' : '';
       return '<div class="mkt-row' + (c.isOverdue ? ' mkt-row-overdue' : '') + (isKey ? '' : ' mkt-row-light') + '">'
         + '<div class="mkt-row-emoji">' + (isKey ? '⭐' : '·') + '</div>'
         + '<div class="mkt-row-name' + (isKey ? '' : ' mkt-row-name-light') + '">' + c.name + '</div>'
-        + '<div class="mkt-row-right">' + urg
+        + '<div class="mkt-row-right">' + touchTypeBadge + urg
         + '<button class="mkt-row-touch" onclick="touchContact(\'' + c.id + '\')" title="Log touch">Log touch</button>'
         + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
         + '</div></div>';
@@ -1955,8 +1957,10 @@ async function saveTouchModal() {
   const notes = document.getElementById('touch-modal-notes').value.trim();
   const c = mktContacts.find(c => c.id === id);
   if (!c) return;
+  const touchType = typeEl.value;
   c.last_touchpoint = date;
-  await patchContact(id, { last_touchpoint: date, notes: notes || c.notes || null });
+  c.last_touch_type = touchType;
+  await patchContact(id, { last_touchpoint: date, last_touch_type: touchType, notes: notes || c.notes || null });
   bg.classList.add('hidden');
   renderMktExisting();
 }

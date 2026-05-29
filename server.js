@@ -54,6 +54,7 @@ async function initDB() {
     notes TEXT,
     stage VARCHAR(20) DEFAULT 'new',
     last_touchpoint DATE,
+    last_touch_type VARCHAR(20),
     influence VARCHAR(20) DEFAULT 'key',
     from_crm BOOLEAN DEFAULT false,
     created_at TIMESTAMP DEFAULT NOW(),
@@ -375,15 +376,15 @@ app.post("/api/marketing-contacts", async (req, res) => {
   const { id, type, name, role, agency, org_type, crm_id, notes, stage, last_touchpoint, influence, from_crm } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO marketing_contacts (id, type, name, role, agency, org_type, crm_id, notes, stage, last_touchpoint, influence, from_crm)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+      `INSERT INTO marketing_contacts (id, type, name, role, agency, org_type, crm_id, notes, stage, last_touchpoint, last_touch_type, influence, from_crm)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        ON CONFLICT (id) DO UPDATE SET
          type=EXCLUDED.type, name=EXCLUDED.name, role=EXCLUDED.role,
          agency=EXCLUDED.agency, org_type=EXCLUDED.org_type, notes=EXCLUDED.notes,
          stage=EXCLUDED.stage, last_touchpoint=EXCLUDED.last_touchpoint,
          influence=EXCLUDED.influence, from_crm=EXCLUDED.from_crm
        RETURNING *`,
-      [id, type||'target', name, role||null, agency||null, org_type||null, crm_id||null, notes||null, stage||'new', last_touchpoint||null, influence||'key', from_crm||false]
+      [id, type||'target', name, role||null, agency||null, org_type||null, crm_id||null, notes||null, stage||'new', last_touchpoint||null, req.body.last_touch_type||null, influence||'key', from_crm||false]
     );
     res.json(result.rows[0]);
   } catch(e) { res.status(500).json({ error: e.message }); }
