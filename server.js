@@ -69,6 +69,7 @@ async function initDB() {
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
   )`);
+  await pool.query(`ALTER TABLE marketing_contacts ADD COLUMN IF NOT EXISTS last_touch_type VARCHAR(20)`);
   console.log('DB ready');
 }
 
