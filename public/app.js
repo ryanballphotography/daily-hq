@@ -1575,7 +1575,7 @@ function renderMktFocus() {
       focusText = '🟡 ' + name + (agency ? ' at ' + agency : '') + ' is due a touchpoint in ' + (90 - worstDays) + ' days. Start thinking about what to say.';
     }
   } else if (mailerDaysSince !== null && mailerDaysSince > 60) {
-    focusText = '📧 Your last mailer was ' + mailerDaysSince + ' days ago. Time to think about what's happening in your world.';
+    focusText = '📧 Your last mailer was ' + mailerDaysSince + ' days ago. Time to think about what\'s happening in your world.';
   } else if (mktContacts.filter(c => c.type === 'existing').length === 0) {
     focusText = '👋 Start by logging a touchpoint for your existing clients — when did you last speak to them?';
   } else {
