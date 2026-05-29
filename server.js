@@ -6,6 +6,7 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 
 const app = express();
+app.set('trust proxy', 1);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
 
 app.use(express.json());
