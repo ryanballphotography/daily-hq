@@ -1563,19 +1563,58 @@ function toggleCheck(id, period) {
 }
 
 // ── Tabs ──────────────────────────────────────────
+function switchMktSubTab(sub, btn) {
+  const mktSubTabVar = sub;
+  document.querySelectorAll('.mkt-subtab').forEach(t => t.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const exEl = document.getElementById('mkt-panel-existing');
+  const tgEl = document.getElementById('mkt-panel-targets');
+  if (exEl) exEl.classList.toggle('hidden', sub !== 'existing');
+  if (tgEl) tgEl.classList.toggle('hidden', sub !== 'targets');
+  if (sub === 'existing') renderMktExisting();
+  else renderMktKanban();
+}
+
 function switchMktTab(tab, btn) {
   mktActiveTab = tab;
   document.querySelectorAll('.mkt-tab').forEach(t => t.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  ['targets','existing','checklist'].forEach(p => {
+  ['pipeline','content'].forEach(p => {
     const el = document.getElementById('mkt-panel-' + p);
     if (el) el.classList.toggle('hidden', p !== tab);
   });
-  const addBtn = document.getElementById('mkt-add-btn');
-  if (addBtn) addBtn.style.display = tab === 'checklist' ? 'none' : '';
-  if (tab === 'targets') renderMktKanban();
-  else if (tab === 'existing') renderMktExisting();
-  else { renderMktChecklists(); updateMktAccCounts(); }
+  if (tab === 'pipeline') renderMktExisting();
+  else loadMarketingContent().then(renderMktContent);
+}
+
+function renderMktFocus() {
+  const el = document.getElementById('mkt-focus-text');
+  if (!el) return;
+  const now = new Date();
+  const existing = mktContacts.filter(c => c.type === 'existing');
+  const noDate = existing.filter(c => !c.last_touchpoint && !c.lastTouchpoint).length;
+  if (existing.length === 0) { el.textContent = 'Loading clients from your shoot planner...'; return; }
+  if (noDate === existing.length) {
+    const first = existing.find(c => (c.influence||'key') === 'key');
+    const name = first ? first.name.split(' ')[0] : 'your clients';
+    el.textContent = 'No touches logged yet. Start with ' + name + ' - when did you last speak to them?';
+    return;
+  }
+  if (noDate > 0) { el.textContent = noDate + ' client' + (noDate>1?'s':'') + ' still need a first touch logged.'; return; }
+  let worst = null, worstDays = -Infinity;
+  mktContacts.forEach(c => {
+    const last = c.last_touchpoint || c.lastTouchpoint;
+    if (!last) return;
+    const d = Math.floor((now - new Date(last)) / 86400000);
+    if (d > worstDays) { worstDays = d; worst = c; }
+  });
+  if (worst && worstDays > 80) {
+    const over = worstDays - 90;
+    const name = worst.name.split(' ')[0];
+    el.textContent = over > 0 ? name + ' is ' + over + 'd overdue. Send a personal email or call.' : name + ' is due a touch in ' + (90-worstDays) + ' days.';
+  } else {
+    el.textContent = 'Everyone is within 90 days. Keep showing up.';
+  }
 }
 
 function renderMarketing() {
