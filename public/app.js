@@ -45,7 +45,6 @@ function bindNav() {
       if (view === 'marketing') {
         renderMarketing();
         loadMarketingContent().then(renderMktContent);
-        loadCrmContacts();
       }
     });
   });
