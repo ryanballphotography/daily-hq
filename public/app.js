@@ -1503,7 +1503,6 @@ async function loadContacts() {
     bg.addEventListener('mousedown', e => { md = e.target === bg; });
     bg.addEventListener('mouseup',   e => { if (md && e.target === bg) closeContactModal(); md = false; });
   }
-  await loadCrmContacts();
   renderMktFocus();
 }
 
