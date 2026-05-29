@@ -1706,9 +1706,8 @@ function renderMktFocus() {
 }
 
 function renderMarketing() {
-  renderMktKanban();
-  renderMktChecklists();
-  updateMktAccCounts();
+  renderMktFocus();
+  renderMktExisting();
 }
 
 // ── Kanban ────────────────────────────────────────
