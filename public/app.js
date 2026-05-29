@@ -1679,7 +1679,7 @@ function renderMktExisting() {
         + '<div class="mkt-row-emoji">' + (isKey ? '⭐' : '·') + '</div>'
         + '<div class="mkt-row-name' + (isKey ? '' : ' mkt-row-name-light') + '">' + c.name + '</div>'
         + '<div class="mkt-row-right">' + urg
-        + '<button class="mkt-row-touch" onclick="touchContact(\'' + c.id + '\')" title="Log touch">📞 Log touch</button>'
+        + '<button class="mkt-row-touch" onclick="touchContact(\'' + c.id + '\')" title="Log touch">Log touch</button>'
         + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
         + '</div></div>';
     }).join('');
@@ -1762,9 +1762,9 @@ function toggleContactType() {
   const roleField = document.getElementById('cm-role-field');
   const stageRow  = document.getElementById('cm-stage-row');
   const existRow  = document.getElementById('cm-existing-row');
-  if (roleField) roleField.style.display = isExisting ? 'none' : '';
-  if (stageRow)  stageRow.style.display  = isExisting ? 'none' : '';
-  if (existRow)  existRow.style.display  = isExisting ? '' : 'none';
+  if (roleField) roleField.classList.toggle('hidden', isExisting);
+  if (stageRow)  stageRow.classList.toggle('hidden', isExisting);
+  if (existRow)  existRow.classList.toggle('hidden', !isExisting);
 }
 
 function openAddContact() {
