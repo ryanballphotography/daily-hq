@@ -952,3 +952,20 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   .mkt-col { min-width: 155px; }
   .mkt-row-name { font-size: 12px; }
 }
+
+/* ── Touch modal ── */
+.touch-type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.touch-type-option { display: flex; align-items: center; gap: 0; cursor: pointer; }
+.touch-type-option input[type="radio"] { display: none; }
+.touch-type-option span {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: var(--radius);
+  border: 0.5px solid var(--border2); background: var(--bg2);
+  font-size: 13px; color: var(--text2); cursor: pointer;
+  width: 100%; transition: all 0.1s;
+}
+.touch-type-option input:checked + span {
+  background: var(--text); color: var(--bg);
+  border-color: var(--text); font-weight: 500;
+}
+.touch-type-option span:hover { background: var(--bg3); color: var(--text); }
