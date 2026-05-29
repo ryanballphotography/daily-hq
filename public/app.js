@@ -1563,9 +1563,23 @@ function renderMktFocus() {
   const mailerDaysSince = lastMailer && lastMailer.sent_at
     ? Math.floor((now - new Date(lastMailer.sent_at)) / 86400000) : null;
 
+  const existingContacts = mktContacts.filter(c => c.type === 'existing');
+  const noDateCount = existingContacts.filter(c => !c.last_touchpoint && !c.lastTouchpoint).length;
   let focusText = '';
 
-  if (urgentContact && worstDays > 80) {
+  if (existingContacts.length === 0) {
+    // No contacts at all yet
+    focusText = '👋 Your existing clients have loaded from the shoot planner. Open each one and log when you last spoke to them.';
+  } else if (noDateCount === existingContacts.length) {
+    // All contacts have no date — most common starting state
+    const firstName = existingContacts.find(c => (c.influence || 'key') === 'key');
+    const name = firstName ? firstName.name.split(' ')[0] : 'your clients';
+    focusText = '📋 No touchpoints logged yet. Start with ' + name + ' — when did you last speak to them? Tap the 📞 button to log it.';
+  } else if (noDateCount > 0) {
+    // Some have dates, some don't
+    focusText = '📋 ' + noDateCount + ' client' + (noDateCount > 1 ? 's' : '') + ' still need a first touchpoint logged. Tap 📞 next to their name.';
+  } else if (urgentContact && worstDays > 80) {
+    // Someone is approaching or past 90 days
     const daysOver = worstDays - 90;
     const name = urgentContact.name.split(' ')[0];
     const agency = urgentContact.agency || '';
@@ -1576,10 +1590,9 @@ function renderMktFocus() {
     }
   } else if (mailerDaysSince !== null && mailerDaysSince > 60) {
     focusText = '📧 Your last mailer was ' + mailerDaysSince + ' days ago. Time to think about what\'s happening in your world.';
-  } else if (mktContacts.filter(c => c.type === 'existing').length === 0) {
-    focusText = '👋 Start by logging a touchpoint for your existing clients — when did you last speak to them?';
   } else {
-    focusText = '✅ Pipeline looks healthy. Keep showing up — consistency is everything.';
+    // Everything genuinely looks good
+    focusText = '✅ Everyone is within 90 days. Keep showing up — consistency is everything.';
   }
 
   el.textContent = focusText;
