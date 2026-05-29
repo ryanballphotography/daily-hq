@@ -1589,6 +1589,78 @@ async function loadMarketingContent() {
   } catch(e) { console.log('content load error', e); }
 }
 
+
+function renderMktContent() {
+  const feed   = mktContent.feed;
+  const mailer = mktContent.mailer;
+  const now    = new Date();
+  if (feed) {
+    const n = document.getElementById('mkt-feed-note'); if (n) n.value = feed.note || '';
+    const d = document.getElementById('mkt-feed-date'); if (d) d.value = feed.planned_date ? feed.planned_date.split('T')[0] : '';
+    const s = document.getElementById('mkt-feed-status'); if (s) s.textContent = feed.sent_at ? 'Posted' : '';
+  }
+  if (mailer) {
+    const n = document.getElementById('mkt-mailer-note'); if (n) n.value = mailer.note || '';
+    const d = document.getElementById('mkt-mailer-date'); if (d) d.value = mailer.planned_date ? mailer.planned_date.split('T')[0] : '';
+    const s = document.getElementById('mkt-mailer-status');
+    const due = document.getElementById('mkt-mailer-due');
+    if (s && mailer.sent_at) {
+      const days = Math.floor((now - new Date(mailer.sent_at)) / 86400000);
+      s.textContent = 'Sent ' + days + 'd ago';
+      if (due) due.textContent = days > 60 ? 'Next one due soon' : 'Next one in ~' + (30 - days) + ' days';
+    }
+  }
+}
+
+async function saveContent(type) {
+  const note = document.getElementById('mkt-' + type + '-note').value.trim();
+  const date = document.getElementById('mkt-' + type + '-date').value;
+  const existing = mktContent[type];
+  try {
+    if (existing && existing.id) {
+      const res = await fetch('/api/marketing-content/' + existing.id, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note, planned_date: date || null, sent_at: existing.sent_at || null })
+      });
+      mktContent[type] = await res.json();
+    } else {
+      const res = await fetch('/api/marketing-content', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, note, planned_date: date || null })
+      });
+      mktContent[type] = await res.json();
+    }
+    const btn = document.querySelector('#mkt-' + type + '-card .mkt-content-save');
+    if (btn) { btn.textContent = 'Saved'; setTimeout(() => { btn.textContent = 'Save idea'; }, 1500); }
+  } catch(e) { console.log('save error', e); }
+}
+
+async function markContentDone(type) {
+  const now  = new Date().toISOString();
+  const note = document.getElementById('mkt-' + type + '-note').value.trim();
+  const date = document.getElementById('mkt-' + type + '-date').value;
+  const existing = mktContent[type];
+  try {
+    if (existing && existing.id) {
+      const res = await fetch('/api/marketing-content/' + existing.id, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note, planned_date: date || null, sent_at: now })
+      });
+      mktContent[type] = await res.json();
+    } else {
+      const res = await fetch('/api/marketing-content', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, note, planned_date: date || null, sent_at: now })
+      });
+      mktContent[type] = await res.json();
+    }
+    document.getElementById('mkt-' + type + '-note').value = '';
+    document.getElementById('mkt-' + type + '-date').value = '';
+    renderMktContent();
+    renderMktFocus();
+  } catch(e) { console.log('mark done error', e); }
+}
+
 function switchMktTab(tab, btn) {
   mktActiveTab = tab;
   document.querySelectorAll('.mkt-tab').forEach(t => t.classList.remove('active'));
