@@ -14,38 +14,6 @@ app.use(cookieParser());
 const crypto = require('crypto');
 
 // ── Auth helpers ──────────────────────────────────
-function totp(secret) {
-  // RFC 6238 TOTP — 30s window, 6 digits
-  const epoch = Math.floor(Date.now() / 30000);
-  function hotp(key, counter) {
-    const buf = Buffer.alloc(8);
-    for (let i = 7; i >= 0; i--) { buf[i] = counter & 0xff; counter >>= 8; }
-    const hmac = crypto.createHmac('sha1', Buffer.from(key, 'base32').toString ? base32decode(key) : key);
-    hmac.update(buf);
-    const h = hmac.digest();
-    const o = h[19] & 0xf;
-    return ((h[o] & 0x7f) << 24 | h[o+1] << 16 | h[o+2] << 8 | h[o+3]) % 1000000;
-  }
-  function base32decode(s) {
-    const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    s = s.toUpperCase().replace(/=+$/, '');
-    let bits = 0, val = 0, out = [];
-    for (const c of s) {
-      val = (val << 5) | alpha.indexOf(c);
-      bits += 5;
-      if (bits >= 8) { out.push((val >> (bits - 8)) & 0xff); bits -= 8; }
-    }
-    return Buffer.from(out);
-  }
-  // Accept current window and +-1 for clock drift
-  const code = parseInt(secret);
-  if (!isNaN(code)) return code; // for testing
-  for (const drift of [0, -1, 1]) {
-    if (hotp(secret, epoch + drift).toString().padStart(6,'0') === secret.toString().padStart(6,'0')) return true;
-  }
-  return hotp(secret, epoch).toString().padStart(6,'0');
-}
-
 function verifyTotp(secret, code) {
   const epoch = Math.floor(Date.now() / 30000);
   function base32decode(s) {
@@ -79,23 +47,44 @@ function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// ── Rate limiting ────────────────────────────────
+const loginAttempts = {};
+function rateLimit(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress;
+  const now = Date.now();
+  if (!loginAttempts[ip]) loginAttempts[ip] = [];
+  loginAttempts[ip] = loginAttempts[ip].filter(t => now - t < 15 * 60 * 1000);
+  if (loginAttempts[ip].length >= 10) {
+    return res.status(429).send('Too many attempts. Try again in 15 minutes.');
+  }
+  loginAttempts[ip].push(now);
+  next();
+}
+
 // ── Auth middleware ───────────────────────────────
 async function checkAuth(req, res, next) {
   const open = ['/login', '/login/verify', '/login/2fa'];
   if (open.includes(req.path)) return next();
-  if (req.path.startsWith('/api/')) return next();
 
   const token = req.cookies['hq_token'];
-  if (!token) return res.redirect('/login');
+  if (!token) {
+    // API calls get 401, page requests get redirect
+    if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorised' });
+    return res.redirect('/login');
+  }
   try {
     const result = await pool.query(
-      "SELECT * FROM hq_sessions WHERE token = $1 AND expires_at > NOW()",
+      "SELECT * FROM hq_sessions WHERE token = $1 AND expires_at > NOW() AND verified = true",
       [token]
     );
-    if (!result.rows.length) return res.redirect('/login');
+    if (!result.rows.length) {
+      if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorised' });
+      return res.redirect('/login');
+    }
     next();
   } catch(e) {
     console.log('Auth error:', e.message);
+    if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorised' });
     res.redirect('/login');
   }
 }
@@ -140,7 +129,7 @@ app.get('/login', (req, res) => {
 </html>`);
 });
 
-app.post('/login', express.urlencoded({ extended: false }), async (req, res) => {
+app.post('/login', rateLimit, express.urlencoded({ extended: false }), async (req, res) => {
   const { username, password } = req.body;
   const validUser = process.env.HQ_USERNAME || 'ryan';
   const validPass = process.env.HQ_PASSWORD;
@@ -195,7 +184,7 @@ app.get('/login/2fa', (req, res) => {
 </html>`);
 });
 
-app.post('/login/verify', express.urlencoded({ extended: false }), async (req, res) => {
+app.post('/login/verify', rateLimit, express.urlencoded({ extended: false }), async (req, res) => {
   const tempToken = req.cookies['hq_temp'];
   if (!tempToken) return res.redirect('/login');
 
@@ -610,9 +599,11 @@ app.post("/api/marketing-contacts", async (req, res) => {
 });
 
 app.patch("/api/marketing-contacts/:id", async (req, res) => {
+  const ALLOWED = ['type','name','role','agency','org_type','notes','stage','last_touchpoint','last_touch_type','influence','from_crm'];
   const fields = req.body;
-  const keys = Object.keys(fields);
-  const values = Object.values(fields);
+  const keys = Object.keys(fields).filter(k => ALLOWED.includes(k));
+  if (!keys.length) return res.status(400).json({ error: 'No valid fields' });
+  const values = keys.map(k => fields[k]);
   const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
   try {
     const result = await pool.query(
@@ -663,4 +654,3 @@ app.patch("/api/marketing-content/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 initDB().then(() => app.listen(PORT, () => console.log(`Daily HQ running on ${PORT}`)));
-// temp debug
