@@ -1917,11 +1917,33 @@ function touchContact(id) {
   if (!c) return;
   document.getElementById('touch-modal-name').textContent = c.name;
   document.getElementById('touch-modal-bg')._contactId = id;
+  const last = c.last_touchpoint || c.lastTouchpoint;
   document.getElementById('touch-modal-date').value = new Date().toISOString().split('T')[0];
-  // Reset radio buttons
   document.querySelectorAll('input[name="touch-type"]').forEach(r => r.checked = false);
-  document.getElementById('touch-modal-notes').value = '';
+  document.getElementById('touch-modal-notes').value = c.notes || '';
+  const lastInfo = document.getElementById('touch-modal-last');
+  const clearBtn = document.getElementById('touch-modal-clear');
+  if (last) {
+    const days = Math.floor((new Date() - new Date(last)) / 86400000);
+    const d = last.toString().split('T')[0];
+    if (lastInfo) lastInfo.textContent = 'Last touch: ' + d + ' (' + days + ' days ago)';
+    if (clearBtn) clearBtn.style.display = '';
+  } else {
+    if (lastInfo) lastInfo.textContent = 'No touch logged yet';
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
   document.getElementById('touch-modal-bg').classList.remove('hidden');
+}
+
+async function clearTouchPoint(id) {
+  const c = mktContacts.find(c => c.id === id);
+  if (!c) return;
+  if (!confirm('Clear last touchpoint for ' + c.name + '?')) return;
+  c.last_touchpoint = null;
+  c.lastTouchpoint = null;
+  await patchContact(id, { last_touchpoint: null });
+  document.getElementById('touch-modal-bg').classList.add('hidden');
+  renderMktExisting();
 }
 
 async function saveTouchModal() {
