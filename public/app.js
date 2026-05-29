@@ -1762,6 +1762,12 @@ function updateMktAccCounts() {
 }
 
 // ── CRM sync ──────────────────────────────────────
+async function refreshCrmContacts(btn) {
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-refresh"></i> Syncing...'; }
+  await loadCrmContacts();
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-refresh"></i> Sync CRM'; }
+}
+
 async function loadCrmContacts() {
   try {
     const res = await fetch('/api/crm-contacts');
