@@ -1501,6 +1501,7 @@ async function loadContacts() {
     bg.addEventListener('mouseup',   e => { if (md && e.target === bg) closeContactModal(); md = false; });
   }
   await loadCrmContacts();
+  renderMktFocus();
 }
 
 async function upsertContact(c) {
@@ -1943,7 +1944,8 @@ async function clearTouchPoint(id) {
   if (!confirm('Clear last touchpoint for ' + c.name + '?')) return;
   c.last_touchpoint = null;
   c.lastTouchpoint = null;
-  await patchContact(id, { last_touchpoint: null });
+  c.last_touch_type = null;
+  await patchContact(id, { last_touchpoint: null, last_touch_type: null });
   document.getElementById('touch-modal-bg').classList.add('hidden');
   renderMktExisting();
 }
