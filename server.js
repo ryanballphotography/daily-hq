@@ -59,6 +59,15 @@ async function initDB() {
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
   )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS marketing_content (
+    id SERIAL PRIMARY KEY,
+    type VARCHAR(20) NOT NULL,
+    note TEXT,
+    planned_date DATE,
+    sent_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+  )`);
   console.log('DB ready');
 }
 
@@ -398,6 +407,37 @@ app.delete("/api/marketing-contacts/:id", async (req, res) => {
   try {
     await pool.query("DELETE FROM marketing_contacts WHERE id = $1", [req.params.id]);
     res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Marketing content (feed posts + mailers) ─────────────────────────────────
+app.get("/api/marketing-content", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM marketing_content ORDER BY created_at DESC");
+    res.json(result.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post("/api/marketing-content", async (req, res) => {
+  const { type, note, planned_date } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO marketing_content (type, note, planned_date)
+       VALUES ($1,$2,$3) RETURNING *`,
+      [type, note || null, planned_date || null]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch("/api/marketing-content/:id", async (req, res) => {
+  const { note, planned_date, sent_at } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE marketing_content SET note=$1, planned_date=$2, sent_at=$3, updated_at=NOW() WHERE id=$4 RETURNING *`,
+      [note || null, planned_date || null, sent_at || null, req.params.id]
+    );
+    res.json(result.rows[0]);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

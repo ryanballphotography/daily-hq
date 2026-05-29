@@ -103,229 +103,84 @@
       <!-- Marketing view -->
       <div class="view hidden" id="view-marketing">
 
-        <!-- Shared header -->
-        <div class="mkt-pipeline-header">
-          <div class="mkt-pipeline-title">
-            <span>Client Pipeline</span>
-            <span class="mkt-pipeline-sub">90-day cycle &middot; creatives before art buyers</span>
-          </div>
-          <button class="btn-add" id="mkt-add-btn" onclick="openAddContact()" style="font-size:12px;padding:5px 12px;flex-shrink:0;"><i class="ti ti-plus"></i> Add contact</button>
+        <!-- Focus card — always visible -->
+        <div class="mkt-focus-card" id="mkt-focus">
+          <div class="mkt-focus-label">📌 This week</div>
+          <div class="mkt-focus-text" id="mkt-focus-text">Loading your pipeline...</div>
         </div>
 
         <!-- Tabs -->
         <div class="mkt-tabs">
-          <button class="mkt-tab active" onclick="switchMktTab('targets',this)"><i class="ti ti-user-plus"></i> New targets</button>
-          <button class="mkt-tab" onclick="switchMktTab('existing',this)"><i class="ti ti-users"></i> Existing clients</button>
-          <button class="mkt-tab" onclick="switchMktTab('checklist',this)"><i class="ti ti-calendar-week"></i> Checklists</button>
+          <button class="mkt-tab active" onclick="switchMktTab('pipeline',this)"><i class="ti ti-users"></i> Pipeline</button>
+          <button class="mkt-tab" onclick="switchMktTab('content',this)"><i class="ti ti-calendar"></i> Content</button>
         </div>
 
-        <!-- Tab: New targets (kanban) -->
-        <div class="mkt-tab-panel" id="mkt-panel-targets">
-          <div class="mkt-kanban" id="mkt-kanban"></div>
+        <!-- Pipeline tab -->
+        <div class="mkt-tab-panel" id="mkt-panel-pipeline">
+          <div class="mkt-subtabs">
+            <button class="mkt-subtab active" id="mkt-subtab-existing" onclick="switchMktSubTab('existing',this)">⭐ Existing clients</button>
+            <button class="mkt-subtab" id="mkt-subtab-targets" onclick="switchMktSubTab('targets',this)">🎯 New targets</button>
+          </div>
+          <div class="mkt-panel-add">
+            <button class="btn-add" id="mkt-add-btn" onclick="openAddContact()" style="font-size:12px;padding:5px 12px;"><i class="ti ti-plus"></i> Add contact</button>
+          </div>
+          <div class="mkt-tab-panel" id="mkt-panel-existing">
+            <div class="mkt-existing-wrap" id="mkt-existing"></div>
+          </div>
+          <div class="mkt-tab-panel hidden" id="mkt-panel-targets">
+            <div class="mkt-kanban" id="mkt-kanban"></div>
+          </div>
         </div>
 
-        <!-- Tab: Existing clients -->
-        <div class="mkt-tab-panel hidden" id="mkt-panel-existing">
-          <div class="mkt-existing-wrap" id="mkt-existing"></div>
-        </div>
+        <!-- Content tab -->
+        <div class="mkt-tab-panel hidden" id="mkt-panel-content">
+          <div class="mkt-content-page">
 
-        <!-- Tab: Checklists -->
-        <div class="mkt-tab-panel hidden" id="mkt-panel-checklist">
-          <div class="mkt-checklist-page">
-            <div class="mkt-cl-section">
-              <div class="mkt-cl-heading"><i class="ti ti-calendar-week"></i> Monday checklist <span class="mkt-acc-count" id="mkt-week-count"></span></div>
-              <div class="mkt-checklist" id="mkt-weekly-checks"></div>
-            </div>
-            <div class="mkt-cl-section">
-              <div class="mkt-cl-heading"><i class="ti ti-calendar-month"></i> Monthly checklist <span class="mkt-acc-count" id="mkt-month-count"></span></div>
-              <div class="mkt-checklist" id="mkt-monthly-checks"></div>
-            </div>
-            <div class="mkt-cl-section">
-              <div class="mkt-cl-heading"><i class="ti ti-info-circle"></i> Ground rules</div>
-              <div class="mkt-rules">
-                <div class="mkt-rule"><span class="mkt-rule-lbl">Sequence</span><span class="mkt-rule-val">Creative first &rarr; then art buyer. Never reverse.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">Mailer floor</span><span class="mkt-rule-val">Every 90 days is the absolute minimum.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">IG quality</span><span class="mkt-rule-val">Only post if it's strong. Never post below standard.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">Email tone</span><span class="mkt-rule-val">No "do you have work for me". Cool. No CTA except website.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">Signature</span><span class="mkt-rule-val">Phone + URL on every single email, no exceptions.</span></div>
+            <div class="mkt-content-card" id="mkt-feed-card">
+              <div class="mkt-content-card-header">
+                <span class="mkt-content-emoji">📸</span>
+                <div>
+                  <div class="mkt-content-title">Next feed post</div>
+                  <div class="mkt-content-sub">Only post when it's genuinely strong</div>
+                </div>
+                <div class="mkt-content-status" id="mkt-feed-status"></div>
+              </div>
+              <textarea class="mkt-content-note" id="mkt-feed-note" placeholder="What's the idea? e.g. pasta shot from Lidl shoot, archive summer series..." rows="2"></textarea>
+              <div class="mkt-content-footer">
+                <input type="date" class="mkt-content-date" id="mkt-feed-date" />
+                <button class="mkt-content-done" onclick="markContentDone('feed')">✓ Posted</button>
+                <button class="mkt-content-save" onclick="saveContent('feed')">Save</button>
               </div>
             </div>
-          </div>
-        </div>
 
-      </div>
-            </div>
-          </div>
-
-          <div class="mkt-accordion">
-            <div class="mkt-acc-header" onclick="toggleMktAcc('monthly')">
-              <div class="mkt-acc-left">
-                <i class="ti ti-calendar-month"></i>
-                <span>Monthly checklist</span>
-                <span class="mkt-acc-count" id="mkt-month-count"></span>
+            <div class="mkt-content-card" id="mkt-mailer-card">
+              <div class="mkt-content-card-header">
+                <span class="mkt-content-emoji">📧</span>
+                <div>
+                  <div class="mkt-content-title">Next mailer</div>
+                  <div class="mkt-content-sub" id="mkt-mailer-due">Monthly — keep it personal, no CTA</div>
+                </div>
+                <div class="mkt-content-status" id="mkt-mailer-status"></div>
               </div>
-              <i class="ti ti-chevron-down mkt-acc-chevron" id="mkt-acc-chev-monthly"></i>
-            </div>
-            <div class="mkt-acc-body hidden" id="mkt-acc-body-monthly">
-              <div class="mkt-checklist" id="mkt-monthly-checks"></div>
-            </div>
-          </div>
-
-          <div class="mkt-accordion">
-            <div class="mkt-acc-header" onclick="toggleMktAcc('rules')">
-              <div class="mkt-acc-left">
-                <i class="ti ti-info-circle"></i>
-                <span>Ground rules</span>
-              </div>
-              <i class="ti ti-chevron-down mkt-acc-chevron" id="mkt-acc-chev-rules"></i>
-            </div>
-            <div class="mkt-acc-body hidden" id="mkt-acc-body-rules">
-              <div class="mkt-rules">
-                <div class="mkt-rule"><span class="mkt-rule-lbl">Sequence</span><span class="mkt-rule-val">Creative first &#8594; then art buyer. Never reverse.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">EDM floor</span><span class="mkt-rule-val">Monthly minimum &#8212; 90 days is the absolute limit.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">IG quality</span><span class="mkt-rule-val">Only post if it's strong. Never post below standard.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">Email tone</span><span class="mkt-rule-val">No "do you have work for me". Cool. No CTA except website.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">Signature</span><span class="mkt-rule-val">Phone + URL on every single email, no exceptions.</span></div>
+              <textarea class="mkt-content-note" id="mkt-mailer-note" placeholder="What's the topic? e.g. Lidl chef select shoot, planning a personal project..." rows="2"></textarea>
+              <div class="mkt-content-footer">
+                <input type="date" class="mkt-content-date" id="mkt-mailer-date" />
+                <button class="mkt-content-done" onclick="markContentDone('mailer')">✓ Sent</button>
+                <button class="mkt-content-save" onclick="saveContent('mailer')">Save</button>
               </div>
             </div>
-          </div>
 
+            <div class="mkt-ground-rules">
+              <div class="mkt-rule"><span class="mkt-rule-lbl">Feed rule</span><span class="mkt-rule-val">Only post if you'd show it to a creative director. Otherwise stories.</span></div>
+              <div class="mkt-rule"><span class="mkt-rule-lbl">Mailer tone</span><span class="mkt-rule-val">What's happening in your world. No "do you have work for me".</span></div>
+              <div class="mkt-rule"><span class="mkt-rule-lbl">Sequence</span><span class="mkt-rule-val">Creative first → then art buyer. Never reverse.</span></div>
+              <div class="mkt-rule"><span class="mkt-rule-lbl">Signature</span><span class="mkt-rule-val">Phone + URL on every email, no exceptions.</span></div>
+            </div>
+
+          </div>
         </div>
+
       </div>
-
-    </div>
-  </div>
-
-  <!-- Floating chat button -->
-  <button class="chat-fab" id="chat-fab" onclick="toggleChat()" title="PA Chat">
-    <i class="ti ti-message-circle"></i>
-  </button>
-
-  <!-- Chat panel -->
-  <div class="chat-panel hidden" id="chat-panel">
-    <div class="chat-panel-header">
-      <span>PA Chat</span>
-      <button onclick="toggleChat()" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:18px;"><i class="ti ti-x"></i></button>
-    </div>
-    <div class="chat-msgs" id="chat-msgs">
-      <div class="msg msg-pa">
-        <div class="msg-label">PA</div>
-        <div class="msg-bubble">Hi Ryan. What's on your mind?</div>
-      </div>
-    </div>
-    <div class="chat-input-row">
-      <input type="text" id="chat-input" placeholder="Ask your PA anything..." />
-      <button class="send-btn" id="chat-send"><i class="ti ti-send"></i></button>
-    </div>
-  </div>
-
-  <!-- Add task modal -->
-  <div class="modal-bg hidden" id="modal-bg">
-    <div class="modal">
-      <div class="modal-header">
-        <div class="modal-title">New task</div>
-        <div class="modal-actions">
-          <button class="btn-cancel" id="modal-cancel">Cancel</button>
-          <button class="btn-save" id="modal-save">Save</button>
-        </div>
-      </div>
-      <div class="modal-body">
-        <div class="modal-field">
-          <label>Task</label>
-          <input type="text" id="m-title" placeholder="What needs doing?" />
-        </div>
-        <div class="modal-field">
-          <label>Notes</label>
-          <textarea id="m-notes" placeholder="Any extra detail..."></textarea>
-        </div>
-        <div class="modal-row">
-          <div class="modal-field">
-            <label>Due date</label>
-            <input type="date" id="m-due" />
-          </div>
-          <div class="modal-field">
-            <label>Priority</label>
-            <select id="m-priority">
-              <option value="p3">P3 — low</option>
-              <option value="p2">P2 — medium</option>
-              <option value="p1">P1 — high</option>
-            </select>
-          </div>
-        </div>
-        <div class="modal-row">
-          <div class="modal-field">
-            <label>Category</label>
-            <select id="m-category">
-              <option value="work">Work</option>
-              <option value="exercise">Exercise</option>
-              <option value="home">Home</option>
-              <option value="personal">Personal</option>
-            </select>
-          </div>
-          <div class="modal-field">
-            <label>Recurring</label>
-            <select id="m-recurring">
-              <option value="">None</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-            </select>
-          </div>
-        </div>
-        <div class="modal-field">
-          <label>Tag</label>
-          <input type="text" id="m-tag" placeholder="e.g. Lidl, Admin" />
-        </div>
-        <div class="modal-field" style="display:flex;align-items:center;gap:8px;margin-top:0.5rem;">
-          <input type="checkbox" id="m-done" style="width:16px;height:16px;cursor:pointer;" />
-          <label for="m-done" style="text-transform:none;font-size:13px;cursor:pointer;color:var(--text2);">Mark as completed</label>
-        </div>
-      </div>
-    </div>
-  </div>
-
-
-  <!-- Mobile tab bar -->
-  <div class="mobile-tabs" id="mobile-tabs">
-    <button class="mobile-tab active" onclick="mobileNav('inbox',this)">
-      <i class="ti ti-inbox"></i>
-      <span>Inbox</span>
-      <span class="mobile-tab-badge" id="mob-inbox-badge" style="display:none"></span>
-    </button>
-    <button class="mobile-tab" onclick="mobileNav('today',this)">
-      <i class="ti ti-layout-dashboard"></i>
-      <span>Today</span>
-    </button>
-    <button class="mobile-tab" onclick="mobileNav('weekly',this)">
-      <i class="ti ti-layout-columns"></i>
-      <span>Weekly</span>
-    </button>
-    <button class="mobile-tab" onclick="mobileNav('all',this)">
-      <i class="ti ti-list-check"></i>
-      <span>Tasks</span>
-      <span class="mobile-tab-badge" id="mob-task-badge" style="display:none"></span>
-    </button>
-    <button class="mobile-tab" onclick="toggleMoreSheet()">
-      <i class="ti ti-dots"></i>
-      <span>More</span>
-    </button>
-  </div>
-
-  <!-- Mobile more sheet -->
-  <div class="mobile-more-sheet" id="mobile-more-sheet">
-    <div class="mobile-more-item" onclick="mobileNav('shoots',null);toggleMoreSheet()"><i class="ti ti-camera"></i> Shoots</div>
-    <div class="mobile-more-item" onclick="mobileNav('marketing',null);toggleMoreSheet()"><i class="ti ti-speakerphone"></i> Marketing</div>
-    <div class="mobile-more-item" onclick="mobileNav('scheduled',null);toggleMoreSheet()"><i class="ti ti-list-details"></i> Scheduled</div>
-    <div class="mobile-more-item" onclick="mobileNav('completed',null);toggleMoreSheet()"><i class="ti ti-circle-check"></i> Completed</div>
-    <div class="mobile-more-item" onclick="mobileNav('calendar',null);toggleMoreSheet()"><i class="ti ti-calendar"></i> Calendar</div>
-    <div class="mobile-more-item" onclick="mobileNav('conversations',null);toggleMoreSheet()"><i class="ti ti-messages"></i> Conversations</div>
-    <div class="mobile-more-item" onclick="window.open('https://shoot-planner.ryanballphotography.com','_blank');toggleMoreSheet()"><i class="ti ti-camera"></i> Shoot Planner</div>
-    <div class="mobile-more-item" onclick="window.open('https://the-darkroom-production.up.railway.app','_blank');toggleMoreSheet()"><i class="ti ti-moon"></i> The Darkroom</div>
-    <div class="mobile-more-item" onclick="window.open('https://app.freeagent.com','_blank');toggleMoreSheet()"><i class="ti ti-receipt"></i> FreeAgent</div>
-  </div>
-
-  <script src="app.js"></script>
-
   <!-- Contact modal -->
   <div class="modal-bg hidden" id="contact-modal-bg">
     <div class="modal">
