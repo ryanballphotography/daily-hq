@@ -1762,9 +1762,9 @@ function toggleContactType() {
   const roleField = document.getElementById('cm-role-field');
   const stageRow  = document.getElementById('cm-stage-row');
   const existRow  = document.getElementById('cm-existing-row');
-  if (roleField) roleField.classList.toggle('hidden', isExisting);
-  if (stageRow)  stageRow.classList.toggle('hidden', isExisting);
-  if (existRow)  existRow.classList.toggle('hidden', !isExisting);
+  if (roleField) roleField.style.display = isExisting ? 'none' : '';
+  if (stageRow)  stageRow.style.display  = isExisting ? 'none' : '';
+  if (existRow)  existRow.style.display  = isExisting ? '' : 'none';
 }
 
 function openAddContact() {
