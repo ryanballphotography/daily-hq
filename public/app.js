@@ -42,7 +42,11 @@ function bindNav() {
       if (view === 'weekly') renderWeekly();
       if (view === 'conversations') renderConversations();
       if (view === 'shoots') renderShoots();
-      if (view === 'marketing') { Promise.all([loadContacts(), loadMarketingContent()]).then(renderMarketing); }
+      if (view === 'marketing') {
+        renderMarketing();
+        loadMarketingContent().then(renderMktContent);
+        loadCrmContacts();
+      }
     });
   });
   document.querySelectorAll('.ni.ext').forEach(el => {
