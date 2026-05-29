@@ -1436,6 +1436,7 @@ function showCalendarView() {
 // MARKETING TAB
 // ══════════════════════════════════════════════════
 
+let mktContent = { feed: null, mailer: null };
 let mktContacts   = [];
 let mktCheckState = {};
 let mktActiveTab  = 'targets';
