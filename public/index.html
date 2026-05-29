@@ -103,53 +103,84 @@
       <!-- Marketing view -->
       <div class="view hidden" id="view-marketing">
 
-        <!-- Shared header -->
-        <div class="mkt-pipeline-header">
-          <div class="mkt-pipeline-title">
-            <span>Client Pipeline</span>
-            <span class="mkt-pipeline-sub">90-day cycle &middot; creatives before art buyers</span>
-          </div>
-          <button class="btn-add" id="mkt-add-btn" onclick="openAddContact()" style="font-size:12px;padding:5px 12px;flex-shrink:0;"><i class="ti ti-plus"></i> Add contact</button>
+        <!-- Focus card -->
+        <div class="mkt-focus-card" id="mkt-focus">
+          <div class="mkt-focus-label">📌 This week</div>
+          <div class="mkt-focus-text" id="mkt-focus-text">Loading your pipeline...</div>
         </div>
 
-        <!-- Tabs -->
+        <!-- Tabs: Pipeline | Content -->
         <div class="mkt-tabs">
-          <button class="mkt-tab active" onclick="switchMktTab('targets',this)"><i class="ti ti-user-plus"></i> New targets</button>
-          <button class="mkt-tab" onclick="switchMktTab('existing',this)"><i class="ti ti-users"></i> Existing clients</button>
-          <button class="mkt-tab" onclick="switchMktTab('checklist',this)"><i class="ti ti-calendar-week"></i> Checklists</button>
+          <button class="mkt-tab active" onclick="switchMktTab('pipeline',this)"><i class="ti ti-users"></i> Pipeline</button>
+          <button class="mkt-tab" onclick="switchMktTab('content',this)"><i class="ti ti-calendar"></i> Content</button>
         </div>
 
-        <!-- Tab: New targets (kanban) -->
-        <div class="mkt-tab-panel" id="mkt-panel-targets">
-          <div class="mkt-kanban" id="mkt-kanban"></div>
+        <!-- Pipeline tab -->
+        <div class="mkt-tab-panel" id="mkt-panel-pipeline">
+          <div class="mkt-subtabs">
+            <button class="mkt-subtab active" onclick="switchMktSubTab('existing',this)">⭐ Existing clients</button>
+            <button class="mkt-subtab" onclick="switchMktSubTab('targets',this)">🎯 New targets</button>
+          </div>
+          <div class="mkt-panel-add">
+            <button class="btn-add" id="mkt-add-btn" onclick="openAddContact()" style="font-size:12px;padding:5px 12px;"><i class="ti ti-plus"></i> Add contact</button>
+          </div>
+          <div class="mkt-tab-panel" id="mkt-panel-existing">
+            <div class="mkt-existing-wrap" id="mkt-existing"></div>
+          </div>
+          <div class="mkt-tab-panel hidden" id="mkt-panel-targets">
+            <div class="mkt-kanban" id="mkt-kanban"></div>
+          </div>
         </div>
 
-        <!-- Tab: Existing clients -->
-        <div class="mkt-tab-panel hidden" id="mkt-panel-existing">
-          <div class="mkt-existing-wrap" id="mkt-existing"></div>
-        </div>
+        <!-- Content tab -->
+        <div class="mkt-tab-panel hidden" id="mkt-panel-content">
+          <div class="mkt-content-page">
 
-        <!-- Tab: Checklists -->
-        <div class="mkt-tab-panel hidden" id="mkt-panel-checklist">
-          <div class="mkt-checklist-page">
-            <div class="mkt-cl-section">
-              <div class="mkt-cl-heading"><i class="ti ti-calendar-week"></i> Monday checklist <span class="mkt-acc-count" id="mkt-week-count"></span></div>
-              <div class="mkt-checklist" id="mkt-weekly-checks"></div>
-            </div>
-            <div class="mkt-cl-section">
-              <div class="mkt-cl-heading"><i class="ti ti-calendar-month"></i> Monthly checklist <span class="mkt-acc-count" id="mkt-month-count"></span></div>
-              <div class="mkt-checklist" id="mkt-monthly-checks"></div>
-            </div>
-            <div class="mkt-cl-section">
-              <div class="mkt-cl-heading"><i class="ti ti-info-circle"></i> Ground rules</div>
-              <div class="mkt-rules">
-                <div class="mkt-rule"><span class="mkt-rule-lbl">Sequence</span><span class="mkt-rule-val">Creative first &rarr; then art buyer. Never reverse.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">Mailer floor</span><span class="mkt-rule-val">Every 90 days is the absolute minimum.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">IG quality</span><span class="mkt-rule-val">Only post if it's strong. Never post below standard.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">Email tone</span><span class="mkt-rule-val">No "do you have work for me". Cool. No CTA except website.</span></div>
-                <div class="mkt-rule"><span class="mkt-rule-lbl">Signature</span><span class="mkt-rule-val">Phone + URL on every single email, no exceptions.</span></div>
+            <div class="mkt-content-card" id="mkt-feed-card">
+              <div class="mkt-content-card-header">
+                <span class="mkt-content-emoji">📸</span>
+                <div>
+                  <div class="mkt-content-title">Next feed post</div>
+                  <div class="mkt-content-sub">Only post when it's genuinely strong</div>
+                </div>
+                <div class="mkt-content-status" id="mkt-feed-status"></div>
+              </div>
+              <textarea class="mkt-content-note" id="mkt-feed-note" placeholder="What's the idea? e.g. pasta shot from Lidl shoot, archive summer series..." rows="2"></textarea>
+              <div class="mkt-content-footer">
+                <input type="date" class="mkt-content-date" id="mkt-feed-date" />
+                <div class="mkt-content-actions">
+                  <button class="mkt-content-save" onclick="saveContent('feed')">Save idea</button>
+                  <button class="mkt-content-done" onclick="markContentDone('feed')">&#10003; Posted</button>
+                </div>
               </div>
             </div>
+
+            <div class="mkt-content-card" id="mkt-mailer-card">
+              <div class="mkt-content-card-header">
+                <span class="mkt-content-emoji">📧</span>
+                <div>
+                  <div class="mkt-content-title">Next mailer</div>
+                  <div class="mkt-content-sub" id="mkt-mailer-due">Monthly — keep it personal, no CTA</div>
+                </div>
+                <div class="mkt-content-status" id="mkt-mailer-status"></div>
+              </div>
+              <textarea class="mkt-content-note" id="mkt-mailer-note" placeholder="What's the topic? e.g. Lidl chef select shoot, planning a personal project..." rows="2"></textarea>
+              <div class="mkt-content-footer">
+                <input type="date" class="mkt-content-date" id="mkt-mailer-date" />
+                <div class="mkt-content-actions">
+                  <button class="mkt-content-save" onclick="saveContent('mailer')">Save idea</button>
+                  <button class="mkt-content-done" onclick="markContentDone('mailer')">&#10003; Sent</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="mkt-ground-rules">
+              <div class="mkt-rule"><span class="mkt-rule-lbl">Feed rule</span><span class="mkt-rule-val">Only post if you'd show it to a creative director. Otherwise stories.</span></div>
+              <div class="mkt-rule"><span class="mkt-rule-lbl">Mailer tone</span><span class="mkt-rule-val">What's happening in your world. No "do you have work for me".</span></div>
+              <div class="mkt-rule"><span class="mkt-rule-lbl">Sequence</span><span class="mkt-rule-val">Creative first &rarr; then art buyer. Never reverse.</span></div>
+              <div class="mkt-rule"><span class="mkt-rule-lbl">Signature</span><span class="mkt-rule-val">Phone + URL on every email, no exceptions.</span></div>
+            </div>
+
           </div>
         </div>
 
