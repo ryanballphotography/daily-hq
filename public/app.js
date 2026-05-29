@@ -43,8 +43,10 @@ function bindNav() {
       if (view === 'conversations') renderConversations();
       if (view === 'shoots') renderShoots();
       if (view === 'marketing') {
-        renderMarketing();
-        loadMarketingContent().then(renderMktContent);
+        loadContacts().then(() => {
+          renderMarketing();
+          loadMarketingContent().then(renderMktContent);
+        });
       }
     });
   });
