@@ -148,8 +148,10 @@
               <textarea class="mkt-content-note" id="mkt-feed-note" placeholder="What's the idea? e.g. pasta shot from Lidl shoot, archive summer series..." rows="2"></textarea>
               <div class="mkt-content-footer">
                 <input type="date" class="mkt-content-date" id="mkt-feed-date" />
-                <button class="mkt-content-done" onclick="markContentDone('feed')">&#10003; Posted</button>
-                <button class="mkt-content-save" onclick="saveContent('feed')">Save</button>
+                <div class="mkt-content-actions">
+                  <button class="mkt-content-save" onclick="saveContent('feed')">Save idea</button>
+                  <button class="mkt-content-done" onclick="markContentDone('feed')">&#10003; Posted</button>
+                </div>
               </div>
             </div>
 
@@ -165,8 +167,10 @@
               <textarea class="mkt-content-note" id="mkt-mailer-note" placeholder="What's the topic? e.g. Lidl chef select shoot, planning a personal project..." rows="2"></textarea>
               <div class="mkt-content-footer">
                 <input type="date" class="mkt-content-date" id="mkt-mailer-date" />
-                <button class="mkt-content-done" onclick="markContentDone('mailer')">&#10003; Sent</button>
-                <button class="mkt-content-save" onclick="saveContent('mailer')">Save</button>
+                <div class="mkt-content-actions">
+                  <button class="mkt-content-save" onclick="saveContent('mailer')">Save idea</button>
+                  <button class="mkt-content-done" onclick="markContentDone('mailer')">&#10003; Sent</button>
+                </div>
               </div>
             </div>
 
