@@ -436,11 +436,13 @@
         <div class="modal-title">Log a touch</div>
         <div class="modal-actions">
           <button class="btn-cancel" onclick="closeTouchModal()">Cancel</button>
+          <button id="touch-modal-clear" class="btn-cancel" style="color:var(--p1);display:none;" onclick="clearTouchPoint(document.getElementById('touch-modal-bg')._contactId)">Clear date</button>
           <button class="btn-save" onclick="saveTouchModal()">Save</button>
         </div>
       </div>
       <div class="modal-body">
-        <div style="font-size:13px;color:var(--text2);margin-bottom:1rem;">How did you connect with <strong id="touch-modal-name"></strong>?</div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:0.5rem;">How did you connect with <strong id="touch-modal-name"></strong>?</div>
+        <div id="touch-modal-last" style="font-size:11px;color:var(--text3);margin-bottom:1rem;"></div>
         <div class="touch-type-grid">
           <label class="touch-type-option">
             <input type="radio" name="touch-type" value="card" />
