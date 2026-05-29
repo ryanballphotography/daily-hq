@@ -1579,6 +1579,16 @@ function switchMktSubTab(sub, btn) {
   else renderMktKanban();
 }
 
+
+async function loadMarketingContent() {
+  try {
+    const res = await fetch('/api/marketing-content');
+    const rows = await res.json();
+    mktContent.feed   = rows.find(r => r.type === 'feed'   && !r.sent_at) || rows.find(r => r.type === 'feed')   || null;
+    mktContent.mailer = rows.find(r => r.type === 'mailer' && !r.sent_at) || rows.find(r => r.type === 'mailer') || null;
+  } catch(e) { console.log('content load error', e); }
+}
+
 function switchMktTab(tab, btn) {
   mktActiveTab = tab;
   document.querySelectorAll('.mkt-tab').forEach(t => t.classList.remove('active'));
