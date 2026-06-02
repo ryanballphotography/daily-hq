@@ -1542,6 +1542,23 @@ async function patchContact(id, fields) {
 
 async function removeContact(id) {
   await fetch('/api/marketing-contacts/' + id, { method: 'DELETE' });
+
+async function toggleInfluence(id) {
+  const c = mktContacts.find(m => m.id === id);
+  if (!c) return;
+  c.influence = (c.influence || 'key') === 'key' ? 'secondary' : 'key';
+  await patchContact(id, { influence: c.influence });
+  renderMktExisting();
+}
+
+const ORG_PRIORITY_KEY = 'mkt_org_priority';
+function getOrgPriority() { try { return JSON.parse(localStorage.getItem(ORG_PRIORITY_KEY)) || {}; } catch(e) { return {}; } }
+function toggleOrgPriority(orgName) {
+  const p = getOrgPriority();
+  p[orgName] = !p[orgName];
+  localStorage.setItem(ORG_PRIORITY_KEY, JSON.stringify(p));
+  renderMktExisting();
+}
 }
 
 function saveCheckState() { localStorage.setItem(MKT_CHECKS_KEY, JSON.stringify(mktCheckState)); }
@@ -1780,10 +1797,20 @@ function renderMktExisting() {
     groups[key].push({ ...c, ...urgencyData(c, now) });
   });
   const groupKeys = Object.keys(groups).sort((a, b) => {
+    const orgP = getOrgPriority();
     const score = cs => cs.some(c => c.isOverdue) ? 0 : cs.some(c => c.isSoon) ? 1 : 2;
     return score(groups[a]) - score(groups[b]);
   });
+  // Deprioritised orgs sort to bottom
+  groupKeys.sort((a, b) => {
+    const orgP = getOrgPriority();
+    const aLow = orgP[a] ? 1 : 0;
+    const bLow = orgP[b] ? 1 : 0;
+    return aLow - bLow;
+  });
   el.innerHTML = groupKeys.map(key => {
+    const orgP = getOrgPriority();
+    const isOrgLow = !!orgP[key];
     const contacts = groups[key].sort((a, b) => {
       const aKey = (a.influence || 'key') === 'key' ? 0 : 1;
       const bKey = (b.influence || 'key') === 'key' ? 0 : 1;
@@ -1794,6 +1821,7 @@ function renderMktExisting() {
     const hasOverdue = contacts.some(c => c.isOverdue);
     const hasSoon    = contacts.some(c => c.isSoon);
     const groupEmoji = hasOverdue ? '🔴' : hasSoon ? '🟡' : '🟢';
+    const safeKey = key.replace(/'/g, "\\'");
     const rows = contacts.map(c => {
       const isKey = (c.influence || 'key') === 'key';
       let urg = '';
@@ -1804,15 +1832,17 @@ function renderMktExisting() {
       const touchTypeLabels = { card:'📬 Card', email:'✉️ Email', call:'📞 Call', gosee:'🤝 Go-see', onset:'🎬 On set', social:'💬 IG/LI', mailer:'📧 Mailer' };
       const touchTypeBadge = c.last_touch_type ? '<span class="mkt-touch-type-badge">' + (touchTypeLabels[c.last_touch_type] || c.last_touch_type) + '</span>' : '';
       return '<div class="mkt-row' + (c.isOverdue ? ' mkt-row-overdue' : '') + (isKey ? '' : ' mkt-row-light') + '">'
-        + '<div class="mkt-row-emoji">' + (isKey ? '⭐' : '·') + '</div>'
+        + '<button class="mkt-row-star' + (isKey ? ' mkt-row-star-on' : '') + '" onclick="toggleInfluence(\'' + c.id + '\')" title="' + (isKey ? 'Mark as secondary' : 'Mark as key') + '">' + (isKey ? '⭐' : '·') + '</button>'
         + '<div class="mkt-row-name' + (isKey ? '' : ' mkt-row-name-light') + '">' + c.name + '</div>'
         + '<div class="mkt-row-right">' + touchTypeBadge + urg
         + '<button class="mkt-row-touch" onclick="touchContact(\'' + c.id + '\')" title="Log touch">Log touch</button>'
         + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
         + '</div></div>';
     }).join('');
-    return '<div class="mkt-group">'
-      + '<div class="mkt-group-header"><span class="mkt-group-emoji">' + groupEmoji + '</span><span class="mkt-group-name">' + key + '</span></div>'
+    return '<div class="mkt-group' + (isOrgLow ? ' mkt-group-low' : '') + '">'
+      + '<div class="mkt-group-header"><span class="mkt-group-emoji">' + groupEmoji + '</span><span class="mkt-group-name">' + key + '</span>'
+      + '<button class="mkt-org-star' + (isOrgLow ? '' : ' mkt-org-star-on') + '" onclick="toggleOrgPriority(\'' + safeKey + '\')" title="' + (isOrgLow ? 'Prioritise org' : 'Deprioritise org') + '">' + (isOrgLow ? '·' : '⭐') + '</button>'
+      + '</div>'
       + '<div class="mkt-group-rows">' + rows + '</div></div>';
   }).join('');
 }
