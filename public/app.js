@@ -1796,21 +1796,16 @@ function renderMktExisting() {
     if (!groups[key]) groups[key] = [];
     groups[key].push({ ...c, ...urgencyData(c, now) });
   });
+  const orgPriority = getOrgPriority();
   const groupKeys = Object.keys(groups).sort((a, b) => {
-    const orgP = getOrgPriority();
+    const aLow = orgPriority[a] ? 1 : 0;
+    const bLow = orgPriority[b] ? 1 : 0;
+    if (aLow !== bLow) return aLow - bLow;
     const score = cs => cs.some(c => c.isOverdue) ? 0 : cs.some(c => c.isSoon) ? 1 : 2;
     return score(groups[a]) - score(groups[b]);
   });
-  // Deprioritised orgs sort to bottom
-  groupKeys.sort((a, b) => {
-    const orgP = getOrgPriority();
-    const aLow = orgP[a] ? 1 : 0;
-    const bLow = orgP[b] ? 1 : 0;
-    return aLow - bLow;
-  });
   el.innerHTML = groupKeys.map(key => {
-    const orgP = getOrgPriority();
-    const isOrgLow = !!orgP[key];
+    const isOrgLow = !!orgPriority[key];
     const contacts = groups[key].sort((a, b) => {
       const aKey = (a.influence || 'key') === 'key' ? 0 : 1;
       const bKey = (b.influence || 'key') === 'key' ? 0 : 1;
