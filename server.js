@@ -1,277 +1,676 @@
+require('dotenv').config();
+const fetch = require('node-fetch');
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const crypto = require('crypto');
-const multer = require('multer');
-const os = require('os');
 const { Pool } = require('pg');
-const drive = require('./drive');
-const cal = require('./calendar');
+const path = require('path');
+const cookieParser = require('cookie-parser');
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
+app.set('trust proxy', 1);
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } });
+
+app.use(express.json());
+app.use(cookieParser());
+
+const crypto = require('crypto');
+
+// ── Auth helpers ──────────────────────────────────
+function verifyTotp(secret, code) {
+  const epoch = Math.floor(Date.now() / 30000);
+  function base32decode(s) {
+    const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    s = s.toUpperCase().replace(/=+$/, '');
+    let bits = 0, val = 0, out = [];
+    for (const c of s) {
+      val = (val << 5) | alpha.indexOf(c);
+      bits += 5;
+      if (bits >= 8) { out.push((val >> (bits - 8)) & 0xff); bits -= 8; }
+    }
+    return Buffer.from(out);
+  }
+  function hotp(key, counter) {
+    const buf = Buffer.alloc(8);
+    for (let i = 7; i >= 0; i--) { buf[i] = counter & 0xff; counter >>= 8; }
+    const hmac = crypto.createHmac('sha1', base32decode(key));
+    hmac.update(buf);
+    const h = hmac.digest();
+    const o = h[19] & 0xf;
+    return ((h[o] & 0x7f) << 24 | h[o+1] << 16 | h[o+2] << 8 | h[o+3]) % 1000000;
+  }
+  const input = parseInt(code);
+  for (const drift of [0, -1, 1]) {
+    if (hotp(secret, epoch + drift) === input) return true;
+  }
+  return false;
+}
+
+function generateToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// ── Rate limiting ────────────────────────────────
+const loginAttempts = {};
+function rateLimit(req, res, next) {
+  const ip = req.ip || req.connection.remoteAddress;
+  const now = Date.now();
+  if (!loginAttempts[ip]) loginAttempts[ip] = [];
+  loginAttempts[ip] = loginAttempts[ip].filter(t => now - t < 15 * 60 * 1000);
+  if (loginAttempts[ip].length >= 10) {
+    return res.status(429).send('Too many attempts. Try again in 15 minutes.');
+  }
+  loginAttempts[ip].push(now);
+  next();
+}
+
+// ── Auth middleware ───────────────────────────────
+async function checkAuth(req, res, next) {
+  const open = ['/login', '/login/verify', '/login/2fa'];
+  if (open.includes(req.path)) return next();
+
+  const token = req.cookies['hq_token'];
+  if (!token) {
+    // API calls get 401, page requests get redirect
+    if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorised' });
+    return res.redirect('/login');
+  }
+  try {
+    const result = await pool.query(
+      "SELECT * FROM hq_sessions WHERE token = $1 AND expires_at > NOW() AND verified = true",
+      [token]
+    );
+    if (!result.rows.length) {
+      if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorised' });
+      return res.redirect('/login');
+    }
+    next();
+  } catch(e) {
+    console.log('Auth error:', e.message);
+    if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorised' });
+    res.redirect('/login');
+  }
+}
+
+app.use(checkAuth);
 app.use(express.static(path.join(__dirname, 'public')));
 
-const PORT = process.env.PORT || 4124;
-const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(os.homedir(), '.shoot_planner_uploads');
-if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-app.use('/uploads', express.static(UPLOADS_DIR));
-
-const storage = multer.diskStorage({
-  destination: UPLOADS_DIR,
-  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/[^a-zA-Z0-9.]/g, '_'))
+// ── Login routes ──────────────────────────────────
+app.get('/login', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily HQ — Login</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #1a1a1a; border: 0.5px solid #2a2a2a; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; }
+    .logo { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .sub { font-size: 12px; color: #666; margin-bottom: 2rem; }
+    label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #666; display: block; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; background: #111; border: 0.5px solid #2a2a2a; border-radius: 8px; color: #e0e0e0; font-size: 14px; outline: none; margin-bottom: 1rem; }
+    input:focus { border-color: #444; }
+    button { width: 100%; padding: 11px; background: #fff; color: #000; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+    button:hover { opacity: 0.9; }
+    .error { font-size: 13px; color: #e05555; margin-bottom: 1rem; background: #2a1010; padding: 8px 12px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Daily HQ</div>
+    <div class="sub">Ryan Ball Photography</div>
+    ${req.query.error ? '<div class="error">Incorrect username or password</div>' : ''}
+    <form method="POST" action="/login">
+      <div><label>Username</label><input type="text" name="username" autofocus autocomplete="username" /></div>
+      <div><label>Password</label><input type="password" name="password" autocomplete="current-password" /></div>
+      <button type="submit">Continue</button>
+    </form>
+  </div>
+</body>
+</html>`);
 });
-const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
 
-// ── Database ──────────────────────────────────────────────────────────────────
-const useDB = !!process.env.DATABASE_URL;
-const pool = useDB ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }) : null;
-const DATA_FILE = path.join(os.homedir(), '.shoot_planner_v2.json');
+app.post('/login', rateLimit, express.urlencoded({ extended: false }), async (req, res) => {
+  const { username, password } = req.body;
+  const validUser = process.env.HQ_USERNAME || 'ryan';
+  const validPass = process.env.HQ_PASSWORD;
+  if (!validPass || username !== validUser || password !== validPass) {
+    return res.redirect('/login?error=1');
+  }
+  // Password correct — issue temp token for 2FA step
+  const tempToken = generateToken();
+  await pool.query(
+    "INSERT INTO hq_sessions (token, expires_at, verified) VALUES ($1, NOW() + INTERVAL '5 minutes', false)",
+    [tempToken]
+  );
+  res.cookie('hq_temp', tempToken, { httpOnly: true, secure: true, maxAge: 300000 });
+  res.redirect('/login/2fa');
+});
+
+app.get('/login/2fa', (req, res) => {
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily HQ — 2FA</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #1a1a1a; border: 0.5px solid #2a2a2a; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; }
+    .logo { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+    .sub { font-size: 13px; color: #888; margin-bottom: 2rem; line-height: 1.5; }
+    label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #666; display: block; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; background: #111; border: 0.5px solid #2a2a2a; border-radius: 8px; color: #e0e0e0; font-size: 20px; letter-spacing: .2em; outline: none; margin-bottom: 1rem; text-align: center; }
+    input:focus { border-color: #444; }
+    button { width: 100%; padding: 11px; background: #fff; color: #000; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
+    button:hover { opacity: 0.9; }
+    .error { font-size: 13px; color: #e05555; margin-bottom: 1rem; background: #2a1010; padding: 8px 12px; border-radius: 6px; }
+    .back { text-align: center; margin-top: 1rem; font-size: 12px; color: #666; }
+    .back a { color: #888; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Two-factor auth</div>
+    <div class="sub">Enter the 6-digit code from your authenticator app.</div>
+    ${req.query.error ? '<div class="error">Invalid code — try again</div>' : ''}
+    <form method="POST" action="/login/verify">
+      <div><label>Authentication code</label><input type="text" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autofocus placeholder="000000" /></div>
+      <button type="submit">Verify</button>
+    </form>
+    <div class="back"><a href="/login">Back to login</a></div>
+  </div>
+</body>
+</html>`);
+});
+
+app.post('/login/verify', rateLimit, express.urlencoded({ extended: false }), async (req, res) => {
+  const tempToken = req.cookies['hq_temp'];
+  if (!tempToken) return res.redirect('/login');
+
+  const { code } = req.body;
+  const secret = process.env.HQ_TOTP_SECRET;
+  if (!secret || !verifyTotp(secret, code)) {
+    return res.redirect('/login/2fa?error=1');
+  }
+
+  // 2FA passed — create real 24h session
+  const sessionToken = generateToken();
+  await pool.query(
+    "INSERT INTO hq_sessions (token, expires_at, verified) VALUES ($1, NOW() + INTERVAL '24 hours', true)",
+    [sessionToken]
+  );
+  // Clean up temp token
+  await pool.query("DELETE FROM hq_sessions WHERE token = $1", [tempToken]);
+
+  res.clearCookie('hq_temp');
+  res.cookie('hq_token', sessionToken, { httpOnly: true, secure: true, maxAge: 86400000 });
+  res.redirect('/');
+});
 
 async function initDB() {
-  if (!useDB) return;
-  await pool.query(`CREATE TABLE IF NOT EXISTS data_store (key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMP DEFAULT NOW());`);
-  console.log('PostgreSQL ready');
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      notes TEXT,
+      due_date DATE,
+      priority VARCHAR(4),
+      category VARCHAR(20) DEFAULT 'work',
+      tag VARCHAR(50),
+      recurring VARCHAR(20),
+      done BOOLEAN DEFAULT false,
+      completed_at TIMESTAMP,
+      snoozed_until DATE,
+      source VARCHAR(50) DEFAULT 'manual',
+      time_block VARCHAR(20) DEFAULT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  // Add time_block column if it doesn't exist (for existing DBs)
+  await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time_block VARCHAR(20) DEFAULT NULL`);
+  await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS shoot_tasks (
+    id SERIAL PRIMARY KEY,
+    shoot_id VARCHAR(100) NOT NULL,
+    shoot_name TEXT,
+    title TEXT NOT NULL,
+    done BOOLEAN DEFAULT false,
+    completed_at TIMESTAMP,
+    due_date DATE,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT NOW()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS marketing_contacts (
+    id VARCHAR(50) PRIMARY KEY,
+    type VARCHAR(20) DEFAULT 'target',
+    name TEXT NOT NULL,
+    role VARCHAR(50),
+    agency TEXT,
+    org_type VARCHAR(50),
+    crm_id VARCHAR(100),
+    notes TEXT,
+    stage VARCHAR(20) DEFAULT 'new',
+    last_touchpoint DATE,
+    last_touch_type VARCHAR(20),
+    influence VARCHAR(20) DEFAULT 'key',
+    from_crm BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+  )`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS marketing_content (
+    id SERIAL PRIMARY KEY,
+    type VARCHAR(20) NOT NULL,
+    note TEXT,
+    planned_date DATE,
+    sent_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+  )`);
+  await pool.query(`ALTER TABLE marketing_contacts ADD COLUMN IF NOT EXISTS last_touch_type VARCHAR(20)`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS hq_sessions (
+    id SERIAL PRIMARY KEY,
+    token VARCHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    verified BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT NOW()
+  )`);
+  // Clean expired sessions
+  await pool.query("DELETE FROM hq_sessions WHERE expires_at < NOW()");
+  console.log('DB ready');
 }
 
-async function load() {
-  if (useDB) {
-    const res = await pool.query("SELECT value FROM data_store WHERE key = 'main'");
-    return res.rows.length > 0 ? res.rows[0].value : { organisations: [], contacts: [], projects: [] };
+app.get('/api/tasks', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM tasks 
+      WHERE done = false 
+      AND (snoozed_until IS NULL OR snoozed_until <= CURRENT_DATE)
+      ORDER BY 
+        CASE priority WHEN 'p1' THEN 1 WHEN 'p2' THEN 2 WHEN 'p3' THEN 3 ELSE 4 END,
+        due_date ASC NULLS LAST,
+        created_at ASC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  try { if (fs.existsSync(DATA_FILE)) return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch(e) {}
-  return { organisations: [], contacts: [], projects: [] };
-}
-
-async function save(data) {
-  if (useDB) {
-    await pool.query(`INSERT INTO data_store (key, value, updated_at) VALUES ('main', $1, NOW()) ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`, [JSON.stringify(data)]);
-  } else {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
-  }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function uid() { return crypto.randomBytes(8).toString('hex'); }
-function magicLink() { return crypto.randomBytes(24).toString('hex'); }
-
-// ── Auth ──────────────────────────────────────────────────────────────────────
-const ADMIN_PASSWORD = (process.env.ADMIN_PASSWORD || 'shoots2024').trim();
-const SESSION_SECRET = process.env.SESSION_SECRET || ('sp_' + ADMIN_PASSWORD + '_2024');
-
-function makeToken() {
-  return crypto.createHmac('sha256', SESSION_SECRET).update('access').digest('hex');
-}
-
-function checkToken(token) {
-  if (!token) return false;
-  return token === makeToken();
-}
-
-// No-cache for all API responses
-app.use('/api', function(req, res, next) {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  next();
 });
 
-// Auth middleware - protect all API routes except public ones
-app.use('/api', function(req, res, next) {
-  const p = req.path;
-  if (p === '/login' || p === '/logout' || p.startsWith('/portal') || p === '/import' || p === '/drive/status' || p === '/ingredients') return next();
-  if (!checkToken(req.headers['x-session-token'])) return res.status(401).json({ error: 'Unauthorized' });
-  next();
-});
-
-app.post('/api/login', (req, res) => {
-  const supplied = (req.body.password || '').trim();
-  if (supplied === ADMIN_PASSWORD) {
-    res.json({ ok: true, token: makeToken() });
-  } else {
-    res.status(401).json({ error: 'Invalid password' });
+app.post('/api/tasks', async (req, res) => {
+  const { title, notes, due_date, priority, category, tag, recurring } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO tasks (title, notes, due_date, priority, category, tag, recurring)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [title, notes, due_date || null, priority || 'p3', category || 'work', tag || null, recurring || null]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/logout', (req, res) => res.json({ ok: true }));
+app.patch('/api/tasks/:id', async (req, res) => {
+  const { id } = req.params;
+  const fields = req.body;
+  const keys = Object.keys(fields);
+  const values = Object.values(fields);
+  const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+  try {
+    const result = await pool.query(
+      `UPDATE tasks SET ${setClause} WHERE id = $${keys.length + 1} RETURNING *`,
+      [...values, id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-// ── Portal helpers ────────────────────────────────────────────────────────────
-function regeneratePortals(proj, data) {
-  if (!proj.portals) proj.portals = {};
-  if (!proj.portals.client) proj.portals.client = magicLink();
-  const ids = new Set();
-  proj.shootDays.forEach(day => {
-    if (day.foodStylistId) ids.add(day.foodStylistId);
-    if (day.propStylistId) ids.add(day.propStylistId);
-    if (day.photoAssistantId) ids.add(day.photoAssistantId);
-    (day.shots||[]).forEach(s => { if (s.designAgencyId) ids.add(s.designAgencyId); });
-  });
-  ids.forEach(id => { if (!proj.portals['contact_'+id]) proj.portals['contact_'+id] = magicLink(); });
-}
+app.delete('/api/tasks/:id', async (req, res) => {
+  try {
+    await pool.query('DELETE FROM tasks WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-function findPortal(token, data) {
-  for (const proj of data.projects) {
-    if (!proj.portals) continue;
-    for (const [key, t] of Object.entries(proj.portals)) {
-      if (t === token) return { proj, key, contactId: key === 'client' ? null : key.replace('contact_',''), isClient: key === 'client' };
+app.patch('/api/tasks/:id/complete', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE tasks SET done = true, completed_at = NOW() WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    const task = result.rows[0];
+    if (task.recurring && task.due_date) {
+      const next = new Date(task.due_date);
+      if (task.recurring === 'daily') next.setDate(next.getDate() + 1);
+      if (task.recurring === 'weekly') next.setDate(next.getDate() + 7);
+      if (task.recurring === 'monthly') next.setMonth(next.getMonth() + 1);
+      await pool.query(
+        `INSERT INTO tasks (title, notes, due_date, priority, category, tag, recurring, source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [task.title, task.notes, next.toISOString().split('T')[0], task.priority, task.category, task.tag, task.recurring, task.source]
+      );
     }
+    res.json(task);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  return null;
-}
+});
 
-// ── Orgs ──────────────────────────────────────────────────────────────────────
-app.get('/api/orgs', async (req, res) => { try { res.json((await load()).organisations); } catch(e) { res.status(500).json({error:e.message}); }});
-app.post('/api/orgs', async (req, res) => { try { const data = await load(); const org = {id:uid(),name:req.body.name||'',type:req.body.type||'Client',departments:req.body.departments||[],website:req.body.website||'',notes:req.body.notes||'',createdAt:new Date().toISOString()}; data.organisations.push(org); await save(data); res.json(org); } catch(e){res.status(500).json({error:e.message});}});
-app.put('/api/orgs/:id', async (req, res) => { try { const data = await load(); const idx = data.organisations.findIndex(o=>o.id===req.params.id); if(idx===-1)return res.status(404).json({error:'Not found'}); data.organisations[idx]={...data.organisations[idx],...req.body,id:req.params.id}; await save(data); res.json(data.organisations[idx]); } catch(e){res.status(500).json({error:e.message});}});
-app.delete('/api/orgs/:id', async (req, res) => { try { const data = await load(); data.organisations=data.organisations.filter(o=>o.id!==req.params.id); await save(data); res.json({ok:true}); } catch(e){res.status(500).json({error:e.message});}});
-
-// ── Contacts ──────────────────────────────────────────────────────────────────
-app.get('/api/contacts', async (req, res) => { try { res.json((await load()).contacts); } catch(e){res.status(500).json({error:e.message});}});
-app.post('/api/contacts', async (req, res) => { try { const data = await load(); const c = {id:uid(),firstName:req.body.firstName||'',lastName:req.body.lastName||'',email:req.body.email||'',phone:req.body.phone||'',orgId:req.body.orgId||null,type:req.body.type||'Client Contact',notes:req.body.notes||'',createdAt:new Date().toISOString()}; data.contacts.push(c); await save(data); res.json(c); } catch(e){res.status(500).json({error:e.message});}});
-app.put('/api/contacts/:id', async (req, res) => { try { const data = await load(); const idx = data.contacts.findIndex(c=>c.id===req.params.id); if(idx===-1)return res.status(404).json({error:'Not found'}); data.contacts[idx]={...data.contacts[idx],...req.body,id:req.params.id}; await save(data); res.json(data.contacts[idx]); } catch(e){res.status(500).json({error:e.message});}});
-app.delete('/api/contacts/:id', async (req, res) => { try { const data = await load(); data.contacts=data.contacts.filter(c=>c.id!==req.params.id); await save(data); res.json({ok:true}); } catch(e){res.status(500).json({error:e.message});}});
-
-// ── Projects ──────────────────────────────────────────────────────────────────
-app.get('/api/projects', async (req, res) => { try { res.json((await load()).projects); } catch(e){res.status(500).json({error:e.message});}});
-app.post('/api/projects', async (req, res) => { try { const data = await load(); const p = {id:uid(),name:req.body.name||'Untitled',orgId:req.body.orgId||null,department:req.body.department||'',commissionedById:req.body.commissionedById||null,status:req.body.status||'Tentative',location:req.body.location||'',startDate:req.body.startDate||'',endDate:req.body.endDate||'',notes:req.body.notes||'',driveUrl:req.body.driveUrl||'',portals:{client:magicLink()},shootDays:[],createdAt:new Date().toISOString()}; data.projects.push(p); await save(data); res.json(p); } catch(e){res.status(500).json({error:e.message});}});
-app.get('/api/projects/:id', async (req, res) => { try { const data = await load(); const p=data.projects.find(p=>p.id===req.params.id); if(!p)return res.status(404).json({error:'Not found'}); res.json(p); } catch(e){res.status(500).json({error:e.message});}});
-app.put('/api/projects/:id', async (req, res) => { try { const data = await load(); const idx=data.projects.findIndex(p=>p.id===req.params.id); if(idx===-1)return res.status(404).json({error:'Not found'}); data.projects[idx]={...data.projects[idx],...req.body,id:req.params.id,portals:data.projects[idx].portals,shootDays:data.projects[idx].shootDays}; await save(data); res.json(data.projects[idx]); } catch(e){res.status(500).json({error:e.message});}});
-app.delete('/api/projects/:id', async (req, res) => { try { const data = await load(); data.projects=data.projects.filter(p=>p.id!==req.params.id); await save(data); res.json({ok:true}); } catch(e){res.status(500).json({error:e.message});}});
-
-// ── Generate days ─────────────────────────────────────────────────────────────
-app.post('/api/projects/:id/generate-days', async (req, res) => { try { const data=await load(); const proj=data.projects.find(p=>p.id===req.params.id); if(!proj)return res.status(404).json({error:'Not found'}); const start=new Date(req.body.startDate),end=new Date(req.body.endDate); const newDays=[]; for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){const ds=d.toISOString().split('T')[0];if(!proj.shootDays.find(x=>x.date===ds)){const day={id:uid(),date:ds,foodStylistId:null,propStylistId:null,photoAssistantId:null,shots:[]};proj.shootDays.push(day);newDays.push(day);}} proj.shootDays.sort((a,b)=>a.date.localeCompare(b.date)); await save(data); res.json(newDays); } catch(e){res.status(500).json({error:e.message});}});
-
-// ── Days ──────────────────────────────────────────────────────────────────────
-app.post('/api/projects/:id/days', async (req, res) => { try { const data=await load(); const proj=data.projects.find(p=>p.id===req.params.id); if(!proj)return res.status(404).json({error:'Not found'}); const day={id:uid(),date:req.body.date||'',foodStylistId:req.body.foodStylistId||null,propStylistId:req.body.propStylistId||null,photoAssistantId:req.body.photoAssistantId||null,shots:[]}; proj.shootDays.push(day); proj.shootDays.sort((a,b)=>a.date.localeCompare(b.date)); regeneratePortals(proj,data); await save(data); res.json(day); } catch(e){res.status(500).json({error:e.message});}});
-app.put('/api/projects/:id/days/:dayId', async (req, res) => { try { const data=await load(); const proj=data.projects.find(p=>p.id===req.params.id); if(!proj)return res.status(404).json({error:'Not found'}); const idx=proj.shootDays.findIndex(d=>d.id===req.params.dayId); if(idx===-1)return res.status(404).json({error:'Not found'}); const shots=proj.shootDays[idx].shots; proj.shootDays[idx]={...proj.shootDays[idx],...req.body,id:req.params.dayId,shots}; regeneratePortals(proj,data); await save(data); res.json(proj.shootDays[idx]); } catch(e){res.status(500).json({error:e.message});}});
-app.delete('/api/projects/:id/days/:dayId', async (req, res) => { try { const data=await load(); const proj=data.projects.find(p=>p.id===req.params.id); if(!proj)return res.status(404).json({error:'Not found'}); proj.shootDays=proj.shootDays.filter(d=>d.id!==req.params.dayId); await save(data); res.json({ok:true}); } catch(e){res.status(500).json({error:e.message});}});
-
-// ── Shots ─────────────────────────────────────────────────────────────────────
-app.post('/api/projects/:id/days/:dayId/shots', async (req, res) => { try { const data=await load(); const proj=data.projects.find(p=>p.id===req.params.id); if(!proj)return res.status(404).json({error:'Not found'}); const day=proj.shootDays.find(d=>d.id===req.params.dayId); if(!day)return res.status(404).json({error:'Not found'}); const shot={id:uid(),shotId:req.body.shotId||'',name:req.body.name||'Untitled',schedule:req.body.schedule||'',scheduleStart:req.body.scheduleStart||'',scheduleEnd:req.body.scheduleEnd||'',designAgencyId:req.body.designAgencyId||null,designAgency:req.body.designAgency||'',status:'To Shoot',servingNotes:'',visualBrief:[],shoppingList:[],propsList:[],approvalImages:[],finalImages:[]}; day.shots.push(shot); regeneratePortals(proj,data); await save(data); res.json(shot); } catch(e){res.status(500).json({error:e.message});}});
-app.put('/api/projects/:id/days/:dayId/shots/:shotId', async (req, res) => { try { const data=await load(); const proj=data.projects.find(p=>p.id===req.params.id); if(!proj)return res.status(404).json({error:'Not found'}); const day=proj.shootDays.find(d=>d.id===req.params.dayId); if(!day)return res.status(404).json({error:'Not found'}); const idx=day.shots.findIndex(s=>s.id===req.params.shotId); if(idx===-1)return res.status(404).json({error:'Not found'}); day.shots[idx]={...day.shots[idx],...req.body,id:req.params.shotId}; regeneratePortals(proj,data); await save(data); res.json(day.shots[idx]); } catch(e){res.status(500).json({error:e.message});}});
-app.delete('/api/projects/:id/days/:dayId/shots/:shotId', async (req, res) => { try { const data=await load(); const proj=data.projects.find(p=>p.id===req.params.id); if(!proj)return res.status(404).json({error:'Not found'}); const day=proj.shootDays.find(d=>d.id===req.params.dayId); if(!day)return res.status(404).json({error:'Not found'}); day.shots=day.shots.filter(s=>s.id!==req.params.shotId); await save(data); res.json({ok:true}); } catch(e){res.status(500).json({error:e.message});}});
-
-// ── Portals ───────────────────────────────────────────────────────────────────
-app.get('/portal/:token', (req, res) => res.sendFile(path.join(__dirname, 'public', 'portal.html')));
-
-app.get('/api/projects/:id/portals', async (req, res) => { try { const data=await load(); const proj=data.projects.find(p=>p.id===req.params.id); if(!proj)return res.status(404).json({error:'Not found'}); const portals=[{label:'Client',type:'client',token:proj.portals.client}]; Object.entries(proj.portals).forEach(([key,token])=>{if(key==='client')return;const cid=key.replace('contact_','');const c=data.contacts.find(x=>x.id===cid);if(c)portals.push({label:c.firstName+' '+c.lastName,type:c.type,token,contactId:cid});}); res.json(portals); } catch(e){res.status(500).json({error:e.message});}});
-
-app.get('/api/portal/:token', async (req, res) => { try {
-  const data=await load(); const result=findPortal(req.params.token,data); if(!result)return res.status(404).json({error:'Invalid link'});
-  const {proj,contactId,isClient}=result; const org=data.organisations.find(o=>o.id===proj.orgId); const contact=contactId?data.contacts.find(c=>c.id===contactId):null;
-  const typeMap={'Food Stylist':'foodStylist','Prop Stylist':'propStylist','Photography Assistant':'assistant','Agency Contact':'agency','Client Contact':'client'};
-  const portalType=contact?(typeMap[contact.type]||'client'):'client';
-  const days=(proj.shootDays||[]).map(day=>{
-    const fs=data.contacts.find(c=>c.id===day.foodStylistId); const ps=data.contacts.find(c=>c.id===day.propStylistId); const pa=data.contacts.find(c=>c.id===day.photoAssistantId);
-    let shots=day.shots||[]; if(portalType==='agency'&&contactId)shots=shots.filter(s=>s.designAgencyId===contactId);
-    let isMyDay=isClient||false;
-    if(!isClient){if(portalType==='foodStylist')isMyDay=day.foodStylistId===contactId;else if(portalType==='propStylist')isMyDay=day.propStylistId===contactId;else if(portalType==='assistant')isMyDay=day.photoAssistantId===contactId;else if(portalType==='agency')isMyDay=shots.length>0;}
-    return {...day,shots,foodStylistName:fs?fs.firstName+' '+fs.lastName:'',propStylistName:ps?ps.firstName+' '+ps.lastName:'',photoAssistantName:pa?pa.firstName+' '+pa.lastName:'',isMyDay};
-  }).filter(d=>d.isMyDay);
-  res.json({type:portalType,contactName:contact?contact.firstName+' '+contact.lastName:'',project:{id:proj.id,name:proj.name,client:org?org.name:'',department:proj.department,status:proj.status,startDate:proj.startDate,endDate:proj.endDate,location:proj.location,driveUrl:proj.driveUrl||''},days});
-} catch(e){res.status(500).json({error:e.message});}});
-
-app.post('/api/portal/:token/shots/:shotId/images/:imgIdx/annotate', async (req, res) => { try { const data=await load(); const result=findPortal(req.params.token,data); if(!result)return res.status(404).json({error:'Invalid link'}); const {proj}=result; for(const day of proj.shootDays){const shot=day.shots.find(s=>s.id===req.params.shotId);if(shot){const img=shot.approvalImages[parseInt(req.params.imgIdx)];if(img&&typeof img==='object'){if(req.body.annotation!==undefined)img.annotation=req.body.annotation;if(req.body.comment!==undefined)img.comment=req.body.comment;if(req.body.comments!==undefined)img.comments=req.body.comments;if(req.body.approved!==undefined)img.approved=req.body.approved;img.reviewedAt=new Date().toISOString();}await save(data);return res.json({ok:true});}} res.status(404).json({error:'Shot not found'}); } catch(e){res.status(500).json({error:e.message});}});
-
-// ── Google Drive ──────────────────────────────────────────────────────────────
-app.get('/auth/google', (req, res) => { res.redirect(drive.getAuthUrl()); });
-
-app.get('/auth/google/callback', async (req, res) => {
+app.get("/api/tasks/completed", async (req, res) => {
   try {
-    const tokens = await drive.exchangeCode(req.query.code);
-    if (useDB) {
-      try {
-        const data = await load();
-        data._driveTokens = tokens; // Save full token including scope
-        await save(data);
-        console.log('Tokens saved to DB, scope:', tokens.scope);
-      } catch(e) { console.error('Failed to save tokens:', e.message); }
+    const result = await pool.query("SELECT * FROM tasks WHERE done = true ORDER BY completed_at DESC LIMIT 50");
+    res.json(result.rows);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/pa/briefing", async (req, res) => {
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify(req.body)
+    });
+    const data = await response.json();
+    if (data.quotes) data.quotes = data.quotes.filter(q => q.name && q.name.trim() && q.name !== "New Quote" && q.clientName && q.clientName.trim());
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post("/api/pa/chat", async (req, res) => {
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify(req.body)
+    });
+    const data = await response.json();
+    if (data.quotes) data.quotes = data.quotes.filter(q => q.name && q.name.trim() && q.name !== "New Quote" && q.clientName && q.clientName.trim());
+    res.json(data);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+app.get("/api/calendar", async (req, res) => {
+  try {
+    const response = await fetch("https://shoot-planner.ryanballphotography.com/api/calendar-events", {
+      headers: { "x-api-key": process.env.DAILY_HQ_SECRET }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+app.get("/api/shoot-planner", async (req, res) => {
+  try {
+    const response = await fetch("https://shoot-planner.ryanballphotography.com/api/daily-hq-summary", {
+      headers: { "x-api-key": process.env.DAILY_HQ_SECRET }
+    });
+    const data = await response.json();
+    if (data.quotes) data.quotes = data.quotes.filter(q => q.name && q.name.trim() && q.name !== "New Quote" && q.clientName && q.clientName.trim());
+    res.json(data);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+
+app.get("/api/gmail-summary", async (req, res) => {
+  try {
+    const taskRes = await pool.query("SELECT title FROM tasks WHERE done = false");
+    const taskTitles = taskRes.rows.map(r => r.title).join('||');
+    const reset = req.query.reset ? "&reset=1" : "";
+    const url = "https://shoot-planner.ryanballphotography.com/api/gmail-summary?tasks=" + encodeURIComponent(taskTitles) + reset;
+    const response = await fetch(url, {
+      headers: { "x-api-key": process.env.DAILY_HQ_SECRET }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+
+
+app.post("/api/gmail-skip", async (req, res) => {
+  try {
+    const response = await fetch("https://shoot-planner.ryanballphotography.com/api/gmail-skip", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": process.env.DAILY_HQ_SECRET },
+      body: JSON.stringify(req.body)
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+
+app.patch("/api/tasks/:id/timeblock", async (req, res) => {
+  const { time_block } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE tasks SET time_block = $1 WHERE id = $2 RETURNING *',
+      [time_block || null, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+
+app.post("/api/tasks/reorder", async (req, res) => {
+  const { taskId, targetTaskId, date, block } = req.body;
+  try {
+    // Get all tasks in this block
+    const result = await pool.query(
+      'SELECT id, sort_order FROM tasks WHERE due_date::date = $1 AND time_block = $2 AND done = false ORDER BY sort_order ASC, id ASC',
+      [date, block]
+    );
+    let ids = result.rows.map(r => r.id);
+    // Move taskId to position of targetTaskId
+    ids = ids.filter(id => id !== taskId);
+    const targetIdx = ids.indexOf(targetTaskId);
+    if (targetIdx === -1) {
+      ids.push(taskId);
+    } else {
+      ids.splice(targetIdx, 0, taskId);
     }
-    res.send('<html><body style="font-family:sans-serif;padding:40px;text-align:center;"><h2>✅ Google Connected!</h2><p>Drive & Calendar ready. You can close this window.</p><script>setTimeout(()=>{window.close();if(window.opener)window.opener.location.reload();},1500);</script></body></html>');
-  } catch(e) { res.status(500).send('Auth failed: ' + e.message); }
-});
-
-app.get('/api/drive/status', (req, res) => res.json({ connected: drive.isAuthenticated() }));
-
-// ── Upload ────────────────────────────────────────────────────────────────────
-app.post('/api/upload', upload.single('image'), async (req, res) => {
-  if(!req.file) return res.status(400).json({error:'No file'});
-  if(drive.isAuthenticated()){
-    try {
-      const buf = fs.readFileSync(req.file.path);
-      const url = await drive.uploadFile(buf, req.file.originalname, req.file.mimetype, req.body.projectName||'Uncategorised', req.body.folderType||'Approvals');
-      fs.unlinkSync(req.file.path);
-      return res.json({ url, drive: true });
-    } catch(e) { console.error('Drive upload failed:', e.message); }
-  }
-  res.json({ url: '/uploads/' + req.file.filename, drive: false });
-});
-
-// ── Ingredients ───────────────────────────────────────────────────────────────
-const INGREDIENT_DB_FILE = process.env.INGREDIENT_DB_FILE || path.join(os.homedir(), '.shoot_planner_ingredients.json');
-function loadIngredients(){try{if(fs.existsSync(INGREDIENT_DB_FILE))return JSON.parse(fs.readFileSync(INGREDIENT_DB_FILE,'utf8'));}catch(e){}return[];}
-app.get('/api/ingredients',(req,res)=>res.json(loadIngredients()));
-app.post('/api/ingredients',(req,res)=>{const items=loadIngredients();const{name,section}=req.body;if(!name)return res.status(400).json({error:'Name required'});const key=name.trim().toLowerCase();const ex=items.find(i=>i.name.toLowerCase()===key);if(ex){ex.section=section;ex.uses=(ex.uses||0)+1;}else{items.push({name:name.trim(),section:section||'',uses:1});}fs.writeFileSync(INGREDIENT_DB_FILE,JSON.stringify(items,null,2));res.json({ok:true});});
-
-// ── Import ────────────────────────────────────────────────────────────────────
-app.post('/api/import', async (req, res) => { try { await save(req.body); res.json({ok:true,projects:req.body.projects.length,orgs:req.body.organisations.length,contacts:req.body.contacts.length}); } catch(e){res.status(500).json({error:e.message});}});
-
-// ── Calendar Sync ────────────────────────────────────────────────────────────
-app.post('/api/calendar/sync', async (req, res) => {
-  try {
-    if (!drive.isAuthenticated()) return res.status(400).json({ error: 'Google not connected - click Connect Drive first' });
-    const data = await load();
-    // Pass Drive's oauth2Client directly to calendar sync
-    const results = await cal.syncProjects(data.projects, data.organisations, drive.getOAuth2Client());
-    const created = results.filter(r => r.action === 'created').length;
-    const updated = results.filter(r => r.action === 'updated').length;
-    const errors = results.filter(r => r.action === 'error').length;
-    res.json({ ok: true, created, updated, errors, results });
-  } catch(e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── Backup ────────────────────────────────────────────────────────────────────
-async function backupToGoogleDrive() {
-  try {
-    if (!drive.isAuthenticated()) return;
-    const data = await load();
-    const buf = Buffer.from(JSON.stringify(data, null, 2), 'utf8');
-    const filename = 'shoot-planner-backup-' + new Date().toISOString().split('T')[0] + '.json';
-    await drive.uploadFile(buf, filename, 'application/json', 'Backups', 'Database');
-    console.log('Backup saved:', filename);
-    return filename;
-  } catch(e) { console.error('Backup failed:', e.message); }
-}
-
-setInterval(backupToGoogleDrive, 24 * 60 * 60 * 1000);
-
-app.post('/api/backup', async (req, res) => {
-  const filename = await backupToGoogleDrive();
-  if (filename) res.json({ ok: true, filename });
-  else res.status(500).json({ error: 'Backup failed - is Google Drive connected?' });
-});
-
-// ── Start ─────────────────────────────────────────────────────────────────────
-async function loadDriveTokens() {
-  if (!useDB) return;
-  try {
-    const data = await load();
-    if (data._driveTokens) {
-      const tokens = data._driveTokens;
-      // Check if token has calendar scope
-      const scope = tokens.scope || '';
-      const hasCalendar = scope.includes('calendar');
-      drive.saveTokens(tokens);
-      console.log('Drive tokens restored, calendar scope:', hasCalendar);
+    // Update sort_order for all
+    for (let i = 0; i < ids.length; i++) {
+      await pool.query('UPDATE tasks SET sort_order = $1 WHERE id = $2', [i, ids[i]]);
     }
-  } catch(e) { console.error('Token restore error:', e.message); }
-}
-
-initDB().then(async () => {
-  await loadDriveTokens();
-  app.listen(PORT, () => console.log('\n📷 Shoot Planner running at http://localhost:' + PORT + '\n'));
-}).catch(err => {
-  console.error('DB init failed:', err.message);
-  app.listen(PORT, () => console.log('\n📷 Shoot Planner running at http://localhost:' + PORT + '\n'));
+    res.json({ success: true });
+  } catch(err) { res.status(500).json({ error: err.message }); }
 });
+
+
+const DEFAULT_SHOOT_TASKS = [
+  'Pencil Studio',
+  'Pencil Stylists',
+  'Pencil Assistant',
+  'Confirm shoot dates with client',
+  'Receive brief / PPM notes',
+  'Write shot list',
+  'Props sourced',
+  'Products received',
+  'Confirm Studio, Stylists and Assistants',
+  'Deliver Brief to Stylists',
+  'Images backed up',
+  'Retouch Images',
+  'Client approval on selects',
+  'Deliver Images',
+  'Purchase Order received',
+  'Invoice Client'
+];
+
+app.get("/api/shoot-tasks/:shootId", async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM shoot_tasks WHERE shoot_id = $1 ORDER BY sort_order ASC, id ASC',
+      [req.params.shootId]
+    );
+    res.json(result.rows);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+app.post("/api/shoot-tasks/:shootId/generate", async (req, res) => {
+  const { shootName } = req.body;
+  try {
+    // Check if tasks already exist
+    const existing = await pool.query('SELECT id FROM shoot_tasks WHERE shoot_id = $1', [req.params.shootId]);
+    if (existing.rows.length > 0) return res.json({ skipped: true, message: 'Tasks already exist' });
+    // Insert default tasks
+    for (let i = 0; i < DEFAULT_SHOOT_TASKS.length; i++) {
+      await pool.query(
+        'INSERT INTO shoot_tasks (shoot_id, shoot_name, title, sort_order) VALUES ($1, $2, $3, $4)',
+        [req.params.shootId, shootName, DEFAULT_SHOOT_TASKS[i], i]
+      );
+    }
+    const result = await pool.query('SELECT * FROM shoot_tasks WHERE shoot_id = $1 ORDER BY sort_order ASC', [req.params.shootId]);
+    res.json(result.rows);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+app.patch("/api/shoot-tasks/:id/complete", async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE shoot_tasks SET done = NOT done, completed_at = CASE WHEN done THEN NULL ELSE NOW() END WHERE id = $1 RETURNING *',
+      [req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+app.patch("/api/shoot-tasks/:id", async (req, res) => {
+  const { due_date } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE shoot_tasks SET due_date = $1 WHERE id = $2 RETURNING *',
+      [due_date || null, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+app.get("/api/shoot-tasks-today", async (req, res) => {
+  try {
+    const result = await pool.query(
+      "SELECT * FROM shoot_tasks WHERE done = false AND due_date = CURRENT_DATE ORDER BY sort_order ASC"
+    );
+    res.json(result.rows);
+  } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+// ── CRM contacts from shoot planner shared DB ─────────────────────────────────
+app.get("/api/crm-contacts", async (req, res) => {
+  try {
+    const response = await fetch("https://shoot-planner.ryanballphotography.com/api/crm-summary", {
+      headers: { "x-api-key": process.env.DAILY_HQ_SECRET }
+    });
+    const data = await response.json();
+    res.json(data);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Marketing contacts ────────────────────────────────────────────────────────
+app.get("/api/marketing-contacts", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM marketing_contacts ORDER BY created_at ASC");
+    res.json(result.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post("/api/marketing-contacts", async (req, res) => {
+  const { id, type, name, role, agency, org_type, crm_id, notes, stage, last_touchpoint, influence, from_crm } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO marketing_contacts (id, type, name, role, agency, org_type, crm_id, notes, stage, last_touchpoint, last_touch_type, influence, from_crm)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       ON CONFLICT (id) DO UPDATE SET
+         type=EXCLUDED.type, name=EXCLUDED.name, role=EXCLUDED.role,
+         agency=EXCLUDED.agency, org_type=EXCLUDED.org_type, notes=EXCLUDED.notes,
+         stage=EXCLUDED.stage, last_touchpoint=EXCLUDED.last_touchpoint,
+         influence=EXCLUDED.influence, from_crm=EXCLUDED.from_crm
+       RETURNING *`,
+      [id, type||'target', name, role||null, agency||null, org_type||null, crm_id||null, notes||null, stage||'new', last_touchpoint||null, req.body.last_touch_type||null, influence||'key', from_crm||false]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch("/api/marketing-contacts/:id", async (req, res) => {
+  const ALLOWED = ['type','name','role','agency','org_type','notes','stage','last_touchpoint','last_touch_type','influence','from_crm'];
+  const fields = req.body;
+  const keys = Object.keys(fields).filter(k => ALLOWED.includes(k));
+  if (!keys.length) return res.status(400).json({ error: 'No valid fields' });
+  const values = keys.map(k => fields[k]);
+  const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+  try {
+    const result = await pool.query(
+      `UPDATE marketing_contacts SET ${setClause}, updated_at=NOW() WHERE id = $${keys.length + 1} RETURNING *`,
+      [...values, req.params.id]
+    );
+    const contact = result.rows[0];
+    if (fields.stage) {
+      const label = contact.agency ? `${contact.name} — ${contact.agency}` : contact.name;
+      const taskMap = {
+        card:   { title: `Email ${label}`,                      days: 7  },
+        email:  { title: `Call ${label}`,                       days: 7  },
+        called: { title: `Arrange coffee/go-see with ${label}`, days: 14 },
+      };
+      const task = taskMap[fields.stage];
+      if (task) {
+        const due = new Date();
+        due.setDate(due.getDate() + task.days);
+        const dueStr = due.toISOString().split('T')[0];
+        await pool.query(
+          `INSERT INTO tasks (title, due_date, priority, category, tag, source) VALUES ($1, $2, 'p1', 'work', 'marketing', 'marketing')`,
+          [task.title, dueStr]
+        );
+      }
+    }
+    res.json(contact);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete("/api/marketing-contacts/:id", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM marketing_contacts WHERE id = $1", [req.params.id]);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Marketing content (feed posts + mailers) ─────────────────────────────────
+app.get("/api/marketing-content", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM marketing_content ORDER BY created_at DESC");
+    res.json(result.rows);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post("/api/marketing-content", async (req, res) => {
+  const { type, note, planned_date } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO marketing_content (type, note, planned_date)
+       VALUES ($1,$2,$3) RETURNING *`,
+      [type, note || null, planned_date || null]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.patch("/api/marketing-content/:id", async (req, res) => {
+  const { note, planned_date, sent_at } = req.body;
+  try {
+    const result = await pool.query(
+      `UPDATE marketing_content SET note=$1, planned_date=$2, sent_at=$3, updated_at=NOW() WHERE id=$4 RETURNING *`,
+      [note || null, planned_date || null, sent_at || null, req.params.id]
+    );
+    res.json(result.rows[0]);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+const PORT = process.env.PORT || 3000;
+initDB().then(() => app.listen(PORT, () => console.log(`Daily HQ running on ${PORT}`)));
