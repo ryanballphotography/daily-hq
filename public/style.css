@@ -1003,3 +1003,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .mkt-org-star.mkt-org-star-on { opacity: 0.9; }
 .mkt-group.mkt-group-low { opacity: 0.6; }
 .mkt-group.mkt-group-low .mkt-group-name { color: var(--text3); }
+
+/* ── Org divider ── */
+.mkt-org-divider { display: flex; align-items: center; gap: 10px; padding: 32px 12px 8px; color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+.mkt-org-divider::before, .mkt-org-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
