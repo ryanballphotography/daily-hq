@@ -2036,6 +2036,7 @@ async function advanceContact(id) {
     c.last_touchpoint = today;
     await patchContact(id, { stage: c.stage, last_touchpoint: today });
     renderMktKanban();
+    await loadTasks();
   }
 }
 
