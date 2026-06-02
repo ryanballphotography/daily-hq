@@ -611,7 +611,30 @@ app.patch("/api/marketing-contacts/:id", async (req, res) => {
       `UPDATE marketing_contacts SET ${setClause}, updated_at=NOW() WHERE id = $${keys.length + 1} RETURNING *`,
       [...values, req.params.id]
     );
-    res.json(result.rows[0]);
+    const contact = result.rows[0];
+
+    // Auto-create follow-up task when stage advances
+    if (fields.stage) {
+      const label = contact.agency ? `${contact.name} — ${contact.agency}` : contact.name;
+      const taskMap = {
+        email:  { title: `Email ${label}`,                    days: 7  },
+        called: { title: `Call ${label}`,                     days: 7  },
+        gosee:  { title: `Arrange coffee/go-see with ${label}`, days: 14 },
+      };
+      const task = taskMap[fields.stage];
+      if (task) {
+        const due = new Date();
+        due.setDate(due.getDate() + task.days);
+        const dueStr = due.toISOString().split('T')[0];
+        await pool.query(
+          `INSERT INTO tasks (title, due_date, priority, category, tag, source)
+           VALUES ($1, $2, 'p1', 'work', 'marketing', 'marketing')`,
+          [task.title, dueStr]
+        );
+      }
+    }
+
+    res.json(contact);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
