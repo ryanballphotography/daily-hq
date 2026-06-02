@@ -1542,6 +1542,7 @@ async function patchContact(id, fields) {
 
 async function removeContact(id) {
   await fetch('/api/marketing-contacts/' + id, { method: 'DELETE' });
+}
 
 async function toggleInfluence(id) {
   const c = mktContacts.find(m => m.id === id);
@@ -1552,13 +1553,14 @@ async function toggleInfluence(id) {
 }
 
 const ORG_PRIORITY_KEY = 'mkt_org_priority';
-function getOrgPriority() { try { return JSON.parse(localStorage.getItem(ORG_PRIORITY_KEY)) || {}; } catch(e) { return {}; } }
+function getOrgPriority() {
+  try { return JSON.parse(localStorage.getItem(ORG_PRIORITY_KEY)) || {}; } catch(e) { return {}; }
+}
 function toggleOrgPriority(orgName) {
   const p = getOrgPriority();
   p[orgName] = !p[orgName];
   localStorage.setItem(ORG_PRIORITY_KEY, JSON.stringify(p));
   renderMktExisting();
-}
 }
 
 function saveCheckState() { localStorage.setItem(MKT_CHECKS_KEY, JSON.stringify(mktCheckState)); }
@@ -1806,6 +1808,7 @@ function renderMktExisting() {
   });
   el.innerHTML = groupKeys.map(key => {
     const isOrgLow = !!orgPriority[key];
+    const safeKey = key.replace(/'/g, "\\'");
     const contacts = groups[key].sort((a, b) => {
       const aKey = (a.influence || 'key') === 'key' ? 0 : 1;
       const bKey = (b.influence || 'key') === 'key' ? 0 : 1;
@@ -1816,7 +1819,6 @@ function renderMktExisting() {
     const hasOverdue = contacts.some(c => c.isOverdue);
     const hasSoon    = contacts.some(c => c.isSoon);
     const groupEmoji = hasOverdue ? '🔴' : hasSoon ? '🟡' : '🟢';
-    const safeKey = key.replace(/'/g, "\\'");
     const rows = contacts.map(c => {
       const isKey = (c.influence || 'key') === 'key';
       let urg = '';
