@@ -1896,6 +1896,7 @@ function renderMktPipeline() {
           + '<div class="mkt-row-right">' + stageHtml + touchTypeBadge + urg
           + '<button class="mkt-row-touch" onclick="touchContact(\'' + c.id + '\')" title="Log touch">Log touch</button>'
           + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
+          + '<button class="mkt-card-icon-btn" onclick="deleteContact(\'' + c.id + '\')" aria-label="Delete"><i class="ti ti-trash"></i></button>'
           + '</div></div>';
       }).join('');
       return '<div class="mkt-group' + (isOrgLow ? ' mkt-group-low' : '') + '">'
