@@ -1015,6 +1015,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .mkt-orgtype-header:hover { color: var(--text); }
 .mkt-orgtype-header i { font-size: 13px; }
 
+.mkt-unstarred-header { font-size: 11px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 2px 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none; opacity: 0.7; }
+.mkt-unstarred-header:hover { opacity: 1; color: var(--text); }
+.mkt-unstarred-header i { font-size: 12px; }
+
 /* ── Outreach stage badge + advance button ── */
 .mkt-stage-badge { font-size: 10px; font-weight: 500; padding: 1px 7px; border-radius: 20px; background: var(--bg3); color: var(--text2); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
 .mkt-stage-badge i { font-size: 11px; }
