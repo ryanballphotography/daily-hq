@@ -1889,9 +1889,10 @@ function renderMktPipeline() {
             : '';
           stageHtml = '<span class="mkt-stage-badge"><i class="ti ' + stageInfo.icon + '"></i> ' + stageInfo.label + '</span>' + advance;
         }
+        const jobTitleHtml = c.job_title ? '<div class="mkt-row-jobtitle">' + c.job_title + '</div>' : '';
         return '<div class="mkt-row' + (c.isOverdue ? ' mkt-row-overdue' : '') + (isKey ? '' : ' mkt-row-light') + '">'
           + '<button class="mkt-row-star' + (isKey ? ' mkt-row-star-on' : '') + '" onclick="toggleInfluence(\'' + c.id + '\')" title="' + (isKey ? 'Mark as secondary' : 'Mark as key') + '">' + (isKey ? '⭐' : '·') + '</button>'
-          + '<div class="mkt-row-name' + (isKey ? '' : ' mkt-row-name-light') + '">' + c.name + '</div>'
+          + '<div class="mkt-row-name' + (isKey ? '' : ' mkt-row-name-light') + '">' + c.name + jobTitleHtml + '</div>'
           + '<div class="mkt-row-right">' + stageHtml + touchTypeBadge + urg
           + '<button class="mkt-row-touch" onclick="touchContact(\'' + c.id + '\')" title="Log touch">Log touch</button>'
           + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
@@ -1977,7 +1978,8 @@ async function loadCrmContacts() {
           saved.name    = c.name;
           saved.agency  = org.orgName;
           saved.org_type = org.orgType;
-          await patchContact(saved.id, { name: c.name, agency: org.orgName, org_type: org.orgType });
+          saved.job_title = c.jobTitle || null;
+          await patchContact(saved.id, { name: c.name, agency: org.orgName, org_type: org.orgType, job_title: c.jobTitle || null });
         } else {
           const nc = {
             id:              'crm_' + c.id,
@@ -1987,6 +1989,7 @@ async function loadCrmContacts() {
             agency:          org.orgName,
             org_type:        org.orgType,
             role:            c.role || null,
+            job_title:       c.jobTitle || null,
             notes:           c.notes || null,
             last_touchpoint: null,
             influence:       'key',

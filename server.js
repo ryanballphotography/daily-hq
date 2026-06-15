@@ -269,6 +269,7 @@ async function initDB() {
     updated_at TIMESTAMP DEFAULT NOW()
   )`);
   await pool.query(`ALTER TABLE marketing_contacts ADD COLUMN IF NOT EXISTS last_touch_type VARCHAR(20)`);
+  await pool.query(`ALTER TABLE marketing_contacts ADD COLUMN IF NOT EXISTS job_title TEXT`);
   await pool.query(`CREATE TABLE IF NOT EXISTS hq_sessions (
     id SERIAL PRIMARY KEY,
     token VARCHAR(64) NOT NULL UNIQUE,
@@ -585,22 +586,22 @@ app.post("/api/marketing-contacts", async (req, res) => {
   const { id, type, name, role, agency, org_type, crm_id, notes, stage, last_touchpoint, influence, from_crm } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO marketing_contacts (id, type, name, role, agency, org_type, crm_id, notes, stage, last_touchpoint, last_touch_type, influence, from_crm)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      `INSERT INTO marketing_contacts (id, type, name, role, agency, org_type, crm_id, notes, stage, last_touchpoint, last_touch_type, influence, from_crm, job_title)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        ON CONFLICT (id) DO UPDATE SET
          type=EXCLUDED.type, name=EXCLUDED.name, role=EXCLUDED.role,
          agency=EXCLUDED.agency, org_type=EXCLUDED.org_type, notes=EXCLUDED.notes,
          stage=EXCLUDED.stage, last_touchpoint=EXCLUDED.last_touchpoint,
-         influence=EXCLUDED.influence, from_crm=EXCLUDED.from_crm
+         influence=EXCLUDED.influence, from_crm=EXCLUDED.from_crm, job_title=EXCLUDED.job_title
        RETURNING *`,
-      [id, type||'target', name, role||null, agency||null, org_type||null, crm_id||null, notes||null, stage||'new', last_touchpoint||null, req.body.last_touch_type||null, influence||'key', from_crm||false]
+      [id, type||'target', name, role||null, agency||null, org_type||null, crm_id||null, notes||null, stage||'new', last_touchpoint||null, req.body.last_touch_type||null, influence||'key', from_crm||false, req.body.job_title||null]
     );
     res.json(result.rows[0]);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.patch("/api/marketing-contacts/:id", async (req, res) => {
-  const ALLOWED = ['type','name','role','agency','org_type','notes','stage','last_touchpoint','last_touch_type','influence','from_crm'];
+  const ALLOWED = ['type','name','role','agency','org_type','notes','stage','last_touchpoint','last_touch_type','influence','from_crm','job_title'];
   const fields = req.body;
   const keys = Object.keys(fields).filter(k => ALLOWED.includes(k));
   if (!keys.length) return res.status(400).json({ error: 'No valid fields' });
