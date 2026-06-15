@@ -1455,6 +1455,22 @@ const STAGES = [
   { id: 'gosee',  label: 'Go-see',        icon: 'ti-briefcase'    },
 ];
 const STAGE_NEXT = { new: 'Card sent', card: 'Email sent', email: 'Called', called: 'Go-see' };
+const STAGE_MAP = {};
+STAGES.forEach(s => STAGE_MAP[s.id] = s);
+
+// CRM groups, in the order the pipeline should be organised
+const ORG_TYPE_ORDER = ['Outreach', 'Client', 'Design Agency', 'Freelance Creatives', 'PR Agency', 'Production Agency'];
+// CRM groups that are crew/suppliers, not marketing pipeline targets — never shown on this tab
+const MKT_EXCLUDE_ORG_TYPES = ['Food Stylist', 'Photo Studio', 'Photography Assistant', 'Prop Stylist'];
+
+function mktGroupType(c) {
+  const raw = (c.org_type || c.orgType || '').trim();
+  if (raw) {
+    const match = ORG_TYPE_ORDER.find(o => o.toLowerCase() === raw.toLowerCase());
+    return match || raw;
+  }
+  return (c.type === 'target') ? 'Outreach' : 'Client';
+}
 
 const WEEKLY_CHECKS = [
   { group: 'Outreach', icon: 'ti-users', items: [
@@ -1549,7 +1565,7 @@ async function toggleInfluence(id) {
   if (!c) return;
   c.influence = (c.influence || 'key') === 'key' ? 'secondary' : 'key';
   await patchContact(id, { influence: c.influence });
-  renderMktExisting();
+  renderMktPipeline();
 }
 
 const ORG_PRIORITY_KEY = 'mkt_org_priority';
@@ -1560,7 +1576,7 @@ function toggleOrgPriority(orgName) {
   const p = getOrgPriority();
   p[orgName] = !p[orgName];
   localStorage.setItem(ORG_PRIORITY_KEY, JSON.stringify(p));
-  renderMktExisting();
+  renderMktPipeline();
 }
 
 function saveCheckState() { localStorage.setItem(MKT_CHECKS_KEY, JSON.stringify(mktCheckState)); }
@@ -1588,17 +1604,6 @@ function toggleCheck(id, period) {
 }
 
 // ── Tabs ──────────────────────────────────────────
-function switchMktSubTab(sub, btn) {
-  const mktSubTabVar = sub;
-  document.querySelectorAll('.mkt-subtab').forEach(t => t.classList.remove('active'));
-  if (btn) btn.classList.add('active');
-  const exEl = document.getElementById('mkt-panel-existing');
-  const tgEl = document.getElementById('mkt-panel-targets');
-  if (exEl) exEl.classList.toggle('hidden', sub !== 'existing');
-  if (tgEl) tgEl.classList.toggle('hidden', sub !== 'targets');
-  if (sub === 'existing') renderMktExisting();
-  else renderMktKanban();
-}
 
 
 async function loadMarketingContent() {
@@ -1690,7 +1695,7 @@ function switchMktTab(tab, btn) {
     const el = document.getElementById('mkt-panel-' + p);
     if (el) el.classList.toggle('hidden', p !== tab);
   });
-  if (tab === 'pipeline') renderMktExisting();
+  if (tab === 'pipeline') renderMktPipeline();
   else loadMarketingContent().then(renderMktContent);
 }
 
@@ -1726,7 +1731,7 @@ function renderMktFocus() {
 
 function renderMarketing() {
   renderMktFocus();
-  renderMktExisting();
+  renderMktPipeline();
 }
 
 // ── Kanban ────────────────────────────────────────
@@ -1783,67 +1788,99 @@ function urgencyData(c, now) {
   return { daysUntil, isOverdue, isSoon, noDate };
 }
 
-function renderMktExisting() {
-  const el = document.getElementById('mkt-existing');
+function renderMktPipeline() {
+  const el = document.getElementById('mkt-pipeline-list');
   if (!el) return;
   const now = new Date();
-  const existing = mktContacts.filter(c => c.type === 'existing');
-  if (!existing.length) {
-    el.innerHTML = '<div class="mkt-pipeline-empty">Loading clients from your shoot planner CRM...</div>';
+  const contacts = mktContacts.filter(c => !MKT_EXCLUDE_ORG_TYPES.some(t => t.toLowerCase() === (c.org_type || c.orgType || '').toLowerCase()));
+  if (!contacts.length) {
+    el.innerHTML = '<div class="mkt-pipeline-empty">Loading contacts from your shoot planner CRM...</div>';
     return;
   }
-  const groups = {};
-  existing.forEach(c => {
-    const key = c.agency || 'Other';
-    if (!groups[key]) groups[key] = [];
-    groups[key].push({ ...c, ...urgencyData(c, now) });
-  });
   const orgPriority = getOrgPriority();
-  const firstLowIdx_pre = Object.keys(groups).filter(k => !!orgPriority[k]);
-  const groupKeys = Object.keys(groups).sort((a, b) => {
-    const aLow = orgPriority[a] ? 1 : 0;
-    const bLow = orgPriority[b] ? 1 : 0;
-    if (aLow !== bLow) return aLow - bLow;
-    const score = cs => cs.some(c => c.isOverdue) ? 0 : cs.some(c => c.isSoon) ? 1 : 2;
-    return score(groups[a]) - score(groups[b]);
+
+  // ── Top-level: group by CRM org type, in the defined order ──
+  const typeGroups = {};
+  contacts.forEach(c => {
+    const t = mktGroupType(c);
+    if (!typeGroups[t]) typeGroups[t] = [];
+    typeGroups[t].push({ ...c, ...urgencyData(c, now) });
   });
-  const firstLowIdx = groupKeys.findIndex(k => !!orgPriority[k]);
-  el.innerHTML = groupKeys.map((key, idx) => {
-    const isOrgLow = !!orgPriority[key];
-    const safeKey = key.replace(/'/g, "\'");
-    const divider = (firstLowIdx > 0 && idx === firstLowIdx) ? '<div class="mkt-org-divider"><span>Lower priority</span></div>' : '';
-    const contacts = groups[key].sort((a, b) => {
-      const aKey = (a.influence || 'key') === 'key' ? 0 : 1;
-      const bKey = (b.influence || 'key') === 'key' ? 0 : 1;
-      if (aKey !== bKey) return aKey - bKey;
-      const urgScore = c => c.isOverdue ? 0 : c.isSoon ? 1 : c.noDate ? 3 : 2;
-      return urgScore(a) - urgScore(b);
+  const typeKeys = Object.keys(typeGroups).sort((a, b) => {
+    const ai = ORG_TYPE_ORDER.indexOf(a), bi = ORG_TYPE_ORDER.indexOf(b);
+    const aRank = ai === -1 ? ORG_TYPE_ORDER.length : ai;
+    const bRank = bi === -1 ? ORG_TYPE_ORDER.length : bi;
+    if (aRank !== bRank) return aRank - bRank;
+    return a.localeCompare(b);
+  });
+
+  el.innerHTML = typeKeys.map(typeKey => {
+    const isOutreach = typeKey === 'Outreach';
+
+    // ── Within each type: group by organisation name ──
+    const groups = {};
+    typeGroups[typeKey].forEach(c => {
+      const key = c.agency || 'Other';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(c);
     });
-    const hasOverdue = contacts.some(c => c.isOverdue);
-    const hasSoon    = contacts.some(c => c.isSoon);
-    const groupEmoji = hasOverdue ? '🔴' : hasSoon ? '🟡' : '🟢';
-    const rows = contacts.map(c => {
-      const isKey = (c.influence || 'key') === 'key';
-      let urg = '';
-      if (c.isOverdue)     urg = '<span class="mkt-row-urgency mkt-urgency-over">🔴 ' + Math.abs(c.daysUntil) + 'd overdue</span>';
-      else if (c.isSoon)   urg = '<span class="mkt-row-urgency mkt-urgency-soon">🟡 ' + c.daysUntil + 'd left</span>';
-      else if (!c.noDate)  urg = '<span class="mkt-row-urgency mkt-urgency-ok">🟢 ' + c.daysUntil + 'd left</span>';
-      else                 urg = '<span class="mkt-row-urgency mkt-urgency-none">— log first touch</span>';
-      const touchTypeLabels = { card:'📬 Card', email:'✉️ Email', call:'📞 Call', gosee:'🤝 Go-see', onset:'🎬 On set', social:'💬 IG/LI', mailer:'📧 Mailer' };
-      const touchTypeBadge = c.last_touch_type ? '<span class="mkt-touch-type-badge">' + (touchTypeLabels[c.last_touch_type] || c.last_touch_type) + '</span>' : '';
-      return '<div class="mkt-row' + (c.isOverdue ? ' mkt-row-overdue' : '') + (isKey ? '' : ' mkt-row-light') + '">'
-        + '<button class="mkt-row-star' + (isKey ? ' mkt-row-star-on' : '') + '" onclick="toggleInfluence(\'' + c.id + '\')" title="' + (isKey ? 'Mark as secondary' : 'Mark as key') + '">' + (isKey ? '⭐' : '·') + '</button>'
-        + '<div class="mkt-row-name' + (isKey ? '' : ' mkt-row-name-light') + '">' + c.name + '</div>'
-        + '<div class="mkt-row-right">' + touchTypeBadge + urg
-        + '<button class="mkt-row-touch" onclick="touchContact(\'' + c.id + '\')" title="Log touch">Log touch</button>'
-        + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
-        + '</div></div>';
+    const groupKeys = Object.keys(groups).sort((a, b) => {
+      const aLow = orgPriority[a] ? 1 : 0;
+      const bLow = orgPriority[b] ? 1 : 0;
+      if (aLow !== bLow) return aLow - bLow;
+      const score = cs => cs.some(c => c.isOverdue) ? 0 : cs.some(c => c.isSoon) ? 1 : 2;
+      return score(groups[a]) - score(groups[b]);
+    });
+    const firstLowIdx = groupKeys.findIndex(k => !!orgPriority[k]);
+
+    const orgsHtml = groupKeys.map((key, idx) => {
+      const isOrgLow = !!orgPriority[key];
+      const safeKey = key.replace(/'/g, "\'");
+      const divider = (firstLowIdx > 0 && idx === firstLowIdx) ? '<div class="mkt-org-divider"><span>Lower priority</span></div>' : '';
+      const orgContacts = groups[key].sort((a, b) => {
+        const aKey = (a.influence || 'key') === 'key' ? 0 : 1;
+        const bKey = (b.influence || 'key') === 'key' ? 0 : 1;
+        if (aKey !== bKey) return aKey - bKey;
+        const urgScore = c => c.isOverdue ? 0 : c.isSoon ? 1 : c.noDate ? 3 : 2;
+        return urgScore(a) - urgScore(b);
+      });
+      const hasOverdue = orgContacts.some(c => c.isOverdue);
+      const hasSoon    = orgContacts.some(c => c.isSoon);
+      const groupEmoji = hasOverdue ? '🔴' : hasSoon ? '🟡' : '🟢';
+      const rows = orgContacts.map(c => {
+        const isKey = (c.influence || 'key') === 'key';
+        let urg = '';
+        if (c.isOverdue)     urg = '<span class="mkt-row-urgency mkt-urgency-over">🔴 ' + Math.abs(c.daysUntil) + 'd overdue</span>';
+        else if (c.isSoon)   urg = '<span class="mkt-row-urgency mkt-urgency-soon">🟡 ' + c.daysUntil + 'd left</span>';
+        else if (!c.noDate)  urg = '<span class="mkt-row-urgency mkt-urgency-ok">🟢 ' + c.daysUntil + 'd left</span>';
+        else                 urg = '<span class="mkt-row-urgency mkt-urgency-none">— log first touch</span>';
+        const touchTypeLabels = { card:'📬 Card', email:'✉️ Email', call:'📞 Call', gosee:'🤝 Go-see', onset:'🎬 On set', social:'💬 IG/LI', mailer:'📧 Mailer' };
+        const touchTypeBadge = c.last_touch_type ? '<span class="mkt-touch-type-badge">' + (touchTypeLabels[c.last_touch_type] || c.last_touch_type) + '</span>' : '';
+        let stageHtml = '';
+        if (isOutreach) {
+          const stageId = c.stage || 'new';
+          const stageInfo = STAGE_MAP[stageId] || STAGE_MAP.new;
+          const advance = stageId !== 'gosee'
+            ? '<button class="mkt-row-advance" onclick="advanceContact(\'' + c.id + '\')" title="Advance to: ' + STAGE_NEXT[stageId] + '"><i class="ti ti-arrow-right"></i></button>'
+            : '';
+          stageHtml = '<span class="mkt-stage-badge"><i class="ti ' + stageInfo.icon + '"></i> ' + stageInfo.label + '</span>' + advance;
+        }
+        return '<div class="mkt-row' + (c.isOverdue ? ' mkt-row-overdue' : '') + (isKey ? '' : ' mkt-row-light') + '">'
+          + '<button class="mkt-row-star' + (isKey ? ' mkt-row-star-on' : '') + '" onclick="toggleInfluence(\'' + c.id + '\')" title="' + (isKey ? 'Mark as secondary' : 'Mark as key') + '">' + (isKey ? '⭐' : '·') + '</button>'
+          + '<div class="mkt-row-name' + (isKey ? '' : ' mkt-row-name-light') + '">' + c.name + '</div>'
+          + '<div class="mkt-row-right">' + stageHtml + touchTypeBadge + urg
+          + '<button class="mkt-row-touch" onclick="touchContact(\'' + c.id + '\')" title="Log touch">Log touch</button>'
+          + '<button class="mkt-card-icon-btn" onclick="editContact(\'' + c.id + '\')" aria-label="Edit"><i class="ti ti-pencil"></i></button>'
+          + '</div></div>';
+      }).join('');
+      return divider + '<div class="mkt-group' + (isOrgLow ? ' mkt-group-low' : '') + '">'
+        + '<div class="mkt-group-header"><span class="mkt-group-emoji">' + groupEmoji + '</span><span class="mkt-group-name">' + key + '</span>'
+        + '<button class="mkt-org-star' + (isOrgLow ? '' : ' mkt-org-star-on') + '" onclick="toggleOrgPriority(\'' + safeKey + '\')" title="' + (isOrgLow ? 'Prioritise org' : 'Deprioritise org') + '">' + (isOrgLow ? '·' : '⭐') + '</button>'
+        + '</div>'
+        + '<div class="mkt-group-rows">' + rows + '</div></div>';
     }).join('');
-    return divider + '<div class="mkt-group' + (isOrgLow ? ' mkt-group-low' : '') + '">'
-      + '<div class="mkt-group-header"><span class="mkt-group-emoji">' + groupEmoji + '</span><span class="mkt-group-name">' + key + '</span>'
-      + '<button class="mkt-org-star' + (isOrgLow ? '' : ' mkt-org-star-on') + '" onclick="toggleOrgPriority(\'' + safeKey + '\')" title="' + (isOrgLow ? 'Prioritise org' : 'Deprioritise org') + '">' + (isOrgLow ? '·' : '⭐') + '</button>'
-      + '</div>'
-      + '<div class="mkt-group-rows">' + rows + '</div></div>';
+
+    return '<div class="mkt-orgtype-section"><div class="mkt-orgtype-header">' + typeKey + '</div>' + orgsHtml + '</div>';
   }).join('');
 }
 
@@ -1915,7 +1952,7 @@ async function loadCrmContacts() {
         }
       }
     }
-    if (mktActiveTab === 'existing') renderMktExisting();
+    renderMktPipeline();
   } catch(e) { console.log('CRM load error', e); }
 }
 
@@ -2013,16 +2050,14 @@ async function saveContact() {
 
   await upsertContact(data);
   closeContactModal();
-  if (isExisting) renderMktExisting();
-  else renderMktKanban();
+  renderMktPipeline();
 }
 
 async function deleteContact(id) {
   if (!confirm('Remove this contact?')) return;
   mktContacts = mktContacts.filter(c => c.id !== id);
   await removeContact(id);
-  if (mktActiveTab === 'existing') renderMktExisting();
-  else renderMktKanban();
+  renderMktPipeline();
 }
 
 async function advanceContact(id) {
@@ -2035,7 +2070,7 @@ async function advanceContact(id) {
     c.stage        = stageIds[idx + 1];
     c.last_touchpoint = today;
     await patchContact(id, { stage: c.stage, last_touchpoint: today });
-    renderMktKanban();
+    renderMktPipeline();
     await loadTasks();
   }
 }
@@ -2072,7 +2107,7 @@ async function clearTouchPoint(id) {
   c.last_touch_type = null;
   await patchContact(id, { last_touchpoint: null, last_touch_type: null });
   document.getElementById('touch-modal-bg').classList.add('hidden');
-  renderMktExisting();
+  renderMktPipeline();
 }
 
 async function saveTouchModal() {
@@ -2089,7 +2124,7 @@ async function saveTouchModal() {
   c.last_touch_type = touchType;
   await patchContact(id, { last_touchpoint: date, last_touch_type: touchType, notes: notes || c.notes || null });
   bg.classList.add('hidden');
-  renderMktExisting();
+  renderMktPipeline();
 }
 
 function closeTouchModal() {

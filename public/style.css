@@ -1007,3 +1007,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* ── Org divider ── */
 .mkt-org-divider { display: flex; align-items: center; gap: 10px; padding: 32px 12px 8px; color: var(--text3); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
 .mkt-org-divider::before, .mkt-org-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── CRM group sections (Outreach, Client, Design Agency, etc.) ── */
+.mkt-orgtype-section { margin-bottom: 22px; }
+.mkt-orgtype-section:last-child { margin-bottom: 0; }
+.mkt-orgtype-header { font-size: 12px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; padding: 0 2px 8px; }
+
+/* ── Outreach stage badge + advance button ── */
+.mkt-stage-badge { font-size: 10px; font-weight: 500; padding: 1px 7px; border-radius: 20px; background: var(--bg3); color: var(--text2); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.mkt-stage-badge i { font-size: 11px; }
+.mkt-row-advance { width: 22px; height: 22px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--text); color: var(--bg); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; padding: 0; flex-shrink: 0; }
+.mkt-row-advance:hover { opacity: 0.85; }

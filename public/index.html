@@ -117,20 +117,11 @@
 
         <!-- Pipeline tab -->
         <div class="mkt-tab-panel" id="mkt-panel-pipeline">
-          <div class="mkt-subtabs">
-            <button class="mkt-subtab active" onclick="switchMktSubTab('existing',this)">Existing clients</button>
-            <button class="mkt-subtab" onclick="switchMktSubTab('targets',this)">New targets</button>
-          </div>
           <div class="mkt-panel-add">
             <button class="btn-add" id="mkt-add-btn" onclick="openAddContact()" style="font-size:12px;padding:5px 12px;"><i class="ti ti-plus"></i> Add contact</button>
             <button onclick="refreshCrmContacts(this)" style="font-size:12px;padding:5px 12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:none;color:var(--text2);cursor:pointer;"><i class="ti ti-refresh"></i> Sync CRM</button>
           </div>
-          <div class="mkt-tab-panel" id="mkt-panel-existing">
-            <div class="mkt-existing-wrap" id="mkt-existing"></div>
-          </div>
-          <div class="mkt-tab-panel hidden" id="mkt-panel-targets">
-            <div class="mkt-kanban" id="mkt-kanban"></div>
-          </div>
+          <div class="mkt-existing-wrap" id="mkt-pipeline-list"></div>
         </div>
 
         <!-- Content tab -->
