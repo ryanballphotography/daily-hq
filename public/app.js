@@ -1855,9 +1855,8 @@ function renderMktPipeline() {
       groups[key].push(c);
     });
     const groupKeys = Object.keys(groups);
-    const urgencyScore = k => groups[k].some(c => c.isOverdue) ? 0 : groups[k].some(c => c.isSoon) ? 1 : 2;
-    const starredKeys = groupKeys.filter(k => !orgPriority[k]).sort((a, b) => urgencyScore(a) - urgencyScore(b));
-    const unstarredKeys = groupKeys.filter(k => !!orgPriority[k]).sort((a, b) => urgencyScore(a) - urgencyScore(b));
+    const starredKeys = groupKeys.filter(k => !orgPriority[k]).sort((a, b) => a.localeCompare(b));
+    const unstarredKeys = groupKeys.filter(k => !!orgPriority[k]).sort((a, b) => a.localeCompare(b));
 
     const renderOrgGroup = (key) => {
       const isOrgLow = !!orgPriority[key];
