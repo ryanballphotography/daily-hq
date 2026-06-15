@@ -1579,6 +1579,23 @@ function toggleOrgPriority(orgName) {
   renderMktPipeline();
 }
 
+const MKT_SECTION_COLLAPSE_KEY = 'mkt_section_collapsed';
+function getMktSectionCollapse() {
+  try { return JSON.parse(localStorage.getItem(MKT_SECTION_COLLAPSE_KEY)) || {}; } catch(e) { return {}; }
+}
+function mktSectionDomId(typeKey) { return typeKey.replace(/[^a-zA-Z0-9]/g, '_'); }
+function toggleMktSection(typeKey) {
+  const content = document.getElementById('mkt-section-' + mktSectionDomId(typeKey));
+  const chev = document.getElementById('mkt-chev-' + mktSectionDomId(typeKey));
+  if (!content) return;
+  const isCollapsed = content.style.display === 'none';
+  const c = getMktSectionCollapse();
+  c[typeKey] = !isCollapsed;
+  localStorage.setItem(MKT_SECTION_COLLAPSE_KEY, JSON.stringify(c));
+  content.style.display = isCollapsed ? '' : 'none';
+  if (chev) { chev.classList.toggle('ti-chevron-right', !isCollapsed); chev.classList.toggle('ti-chevron-down', isCollapsed); }
+}
+
 function saveCheckState() { localStorage.setItem(MKT_CHECKS_KEY, JSON.stringify(mktCheckState)); }
 
 function weekKey() {
@@ -1798,25 +1815,38 @@ function renderMktPipeline() {
     return;
   }
   const orgPriority = getOrgPriority();
+  const typeRank = t => { const i = ORG_TYPE_ORDER.indexOf(t); return i === -1 ? ORG_TYPE_ORDER.length : i; };
 
-  // ── Top-level: group by CRM org type, in the defined order ──
+  // ── Determine each contact's own CRM type, then a canonical type per
+  //    organisation (agency name) — the most-active type any of its
+  //    contacts have. This merges orgs that appear under multiple CRM
+  //    categories (e.g. an org tagged both Client and Outreach) into one
+  //    group, under whichever category ranks first in ORG_TYPE_ORDER. ──
+  const withType = contacts.map(c => ({ ...c, ...urgencyData(c, now), _ownType: mktGroupType(c) }));
+  const agencyCanonical = {};
+  withType.forEach(c => {
+    const agencyKey = (c.agency || 'Other').trim().toLowerCase();
+    if (!(agencyKey in agencyCanonical) || typeRank(c._ownType) < typeRank(agencyCanonical[agencyKey])) {
+      agencyCanonical[agencyKey] = c._ownType;
+    }
+  });
+
+  // ── Top-level: group by canonical CRM org type, in the defined order ──
   const typeGroups = {};
-  contacts.forEach(c => {
-    const t = mktGroupType(c);
+  withType.forEach(c => {
+    const agencyKey = (c.agency || 'Other').trim().toLowerCase();
+    const t = agencyCanonical[agencyKey];
     if (!typeGroups[t]) typeGroups[t] = [];
-    typeGroups[t].push({ ...c, ...urgencyData(c, now) });
+    typeGroups[t].push(c);
   });
   const typeKeys = Object.keys(typeGroups).sort((a, b) => {
-    const ai = ORG_TYPE_ORDER.indexOf(a), bi = ORG_TYPE_ORDER.indexOf(b);
-    const aRank = ai === -1 ? ORG_TYPE_ORDER.length : ai;
-    const bRank = bi === -1 ? ORG_TYPE_ORDER.length : bi;
+    const aRank = typeRank(a), bRank = typeRank(b);
     if (aRank !== bRank) return aRank - bRank;
     return a.localeCompare(b);
   });
 
+  const collapsePrefs = getMktSectionCollapse();
   el.innerHTML = typeKeys.map(typeKey => {
-    const isOutreach = typeKey === 'Outreach';
-
     // ── Within each type: group by organisation name ──
     const groups = {};
     typeGroups[typeKey].forEach(c => {
@@ -1857,7 +1887,7 @@ function renderMktPipeline() {
         const touchTypeLabels = { card:'📬 Card', email:'✉️ Email', call:'📞 Call', gosee:'🤝 Go-see', onset:'🎬 On set', social:'💬 IG/LI', mailer:'📧 Mailer' };
         const touchTypeBadge = c.last_touch_type ? '<span class="mkt-touch-type-badge">' + (touchTypeLabels[c.last_touch_type] || c.last_touch_type) + '</span>' : '';
         let stageHtml = '';
-        if (isOutreach) {
+        if (c._ownType === 'Outreach') {
           const stageId = c.stage || 'new';
           const stageInfo = STAGE_MAP[stageId] || STAGE_MAP.new;
           const advance = stageId !== 'gosee'
@@ -1880,7 +1910,17 @@ function renderMktPipeline() {
         + '<div class="mkt-group-rows">' + rows + '</div></div>';
     }).join('');
 
-    return '<div class="mkt-orgtype-section"><div class="mkt-orgtype-header">' + typeKey + '</div>' + orgsHtml + '</div>';
+    const sectionHasUrgent = typeGroups[typeKey].some(c => c.isOverdue || c.isSoon);
+    const collapsed = Object.prototype.hasOwnProperty.call(collapsePrefs, typeKey) ? collapsePrefs[typeKey] : !sectionHasUrgent;
+    const safeType = typeKey.replace(/'/g, "\\'");
+    const domId = mktSectionDomId(typeKey);
+    const header = '<div class="mkt-orgtype-header" onclick="toggleMktSection(\'' + safeType + '\')">'
+      + '<i id="mkt-chev-' + domId + '" class="ti ' + (collapsed ? 'ti-chevron-right' : 'ti-chevron-down') + '"></i> ' + typeKey
+      + '</div>';
+
+    return '<div class="mkt-orgtype-section">' + header
+      + '<div id="mkt-section-' + domId + '"' + (collapsed ? ' style="display:none;"' : '') + '>' + orgsHtml + '</div>'
+      + '</div>';
   }).join('');
 }
 

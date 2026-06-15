@@ -1011,7 +1011,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* ── CRM group sections (Outreach, Client, Design Agency, etc.) ── */
 .mkt-orgtype-section { margin-bottom: 22px; }
 .mkt-orgtype-section:last-child { margin-bottom: 0; }
-.mkt-orgtype-header { font-size: 12px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; padding: 0 2px 8px; }
+.mkt-orgtype-header { font-size: 12px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 2px 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none; }
+.mkt-orgtype-header:hover { color: var(--text); }
+.mkt-orgtype-header i { font-size: 13px; }
 
 /* ── Outreach stage badge + advance button ── */
 .mkt-stage-badge { font-size: 10px; font-weight: 500; padding: 1px 7px; border-radius: 20px; background: var(--bg3); color: var(--text2); white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
