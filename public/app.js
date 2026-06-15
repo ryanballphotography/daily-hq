@@ -1865,8 +1865,7 @@ function renderMktPipeline() {
         const aKey = (a.influence || 'key') === 'key' ? 0 : 1;
         const bKey = (b.influence || 'key') === 'key' ? 0 : 1;
         if (aKey !== bKey) return aKey - bKey;
-        const urgScore = c => c.isOverdue ? 0 : c.isSoon ? 1 : c.noDate ? 3 : 2;
-        return urgScore(a) - urgScore(b);
+        return a.name.localeCompare(b.name);
       });
       const hasOverdue = orgContacts.some(c => c.isOverdue);
       const hasSoon    = orgContacts.some(c => c.isSoon);
