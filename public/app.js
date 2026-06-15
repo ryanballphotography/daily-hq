@@ -1929,9 +1929,10 @@ async function loadCrmContacts() {
         const saved = mktContacts.find(m => m.crm_id === c.id);
         if (saved) {
           // Update CRM-sourced fields only — preserve influence + last_touchpoint
-          saved.name   = c.name;
-          saved.agency = org.orgName;
-          await patchContact(saved.id, { name: c.name, agency: org.orgName });
+          saved.name    = c.name;
+          saved.agency  = org.orgName;
+          saved.org_type = org.orgType;
+          await patchContact(saved.id, { name: c.name, agency: org.orgName, org_type: org.orgType });
         } else {
           const nc = {
             id:              'crm_' + c.id,
