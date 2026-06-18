@@ -64,7 +64,7 @@ function rateLimit(req, res, next) {
 
 // ── Auth middleware ───────────────────────────────
 async function checkAuth(req, res, next) {
-  const open = ['/login', '/login/verify', '/login/2fa'];
+  const open = ['/login', '/login/verify', '/login/2fa', '/api/siri/add-task'];
   if (open.includes(req.path)) return next();
 
   const token = req.cookies['hq_token'];
@@ -294,6 +294,26 @@ app.get('/api/tasks', async (req, res) => {
         created_at ASC
     `);
     res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Siri shortcut endpoint — protected by SIRI_SECRET token
+app.post('/api/siri/add-task', async (req, res) => {
+  const token = req.headers['x-siri-token'] || req.query.token;
+  if (!token || token !== process.env.SIRI_SECRET) {
+    return res.status(401).json({ error: 'Unauthorised' });
+  }
+  const { title, notes, due_date, priority } = req.body;
+  if (!title) return res.status(400).json({ error: 'title is required' });
+  try {
+    const result = await pool.query(
+      `INSERT INTO tasks (title, notes, due_date, priority, category)
+       VALUES ($1,$2,$3,$4,'work') RETURNING *`,
+      [title, notes || null, due_date || null, priority || 'p2']
+    );
+    res.json({ ok: true, task: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
