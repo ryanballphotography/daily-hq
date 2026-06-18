@@ -64,7 +64,7 @@ function rateLimit(req, res, next) {
 
 // ── Auth middleware ───────────────────────────────
 async function checkAuth(req, res, next) {
-  const open = ['/login', '/login/verify', '/login/2fa'];
+  const open = ['/login', '/login/verify', '/login/2fa', '/api/siri/add-task'];
   if (open.includes(req.path)) return next();
 
   const token = req.cookies['hq_token'];
@@ -294,6 +294,37 @@ app.get('/api/tasks', async (req, res) => {
         created_at ASC
     `);
     res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/siri/add-task', async (req, res) => {
+  const token = req.headers['x-siri-token'] || req.query.token;
+  if (!token || token !== process.env.SIRI_SECRET) {
+    return res.status(401).json({ error: 'Unauthorised' });
+  }
+  const { title } = req.body;
+  if (!title) return res.status(400).json({ error: 'title is required' });
+  let parsed = { title, due_date: null, time_block: null };
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const dow = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
+    const cr = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 200, messages: [{ role: 'user', content: 'Today is ' + dow + ' ' + today + '. Parse this voice task into JSON with fields: title (string, task without date/time), due_date (YYYY-MM-DD or null), time_block (HH:MM 24hr or null). Respond with ONLY raw JSON.\n\nVoice input: "' + title + '"' }] })
+    });
+    const cd = await cr.json();
+    const txt = cd.content && cd.content[0] && cd.content[0].text && cd.content[0].text.trim();
+    if (txt) parsed = JSON.parse(txt);
+  } catch(e) { console.error('Claude parse error:', e.message); }
+  try {
+    const result = await pool.query(
+      'INSERT INTO tasks (title, due_date, time_block, priority, category) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [parsed.title || title, parsed.due_date || null, parsed.time_block || null, 'p2', 'work']
+    );
+    res.json({ ok: true, task: result.rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
