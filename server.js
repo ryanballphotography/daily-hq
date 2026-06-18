@@ -317,7 +317,8 @@ app.post('/api/siri/add-task', async (req, res) => {
     });
     const cd = await cr.json();
     const txt = cd.content && cd.content[0] && cd.content[0].text && cd.content[0].text.trim();
-    if (txt) parsed = JSON.parse(txt);
+    const clean = txt.replace(/```json/g, '').replace(/```/g, '').trim();
+    if (clean) parsed = JSON.parse(clean);
   } catch(e) { console.error('Claude parse error:', e.message); }
   try {
     const result = await pool.query(
