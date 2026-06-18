@@ -299,6 +299,26 @@ app.get('/api/tasks', async (req, res) => {
   }
 });
 
+// Siri shortcut endpoint — protected by SIRI_SECRET token
+app.post('/api/siri/add-task', async (req, res) => {
+  const token = req.headers['x-siri-token'] || req.query.token;
+  if (!token || token !== process.env.SIRI_SECRET) {
+    return res.status(401).json({ error: 'Unauthorised' });
+  }
+  const { title, notes, due_date, priority } = req.body;
+  if (!title) return res.status(400).json({ error: 'title is required' });
+  try {
+    const result = await pool.query(
+      `INSERT INTO tasks (title, notes, due_date, priority, category)
+       VALUES ($1,$2,$3,$4,'work') RETURNING *`,
+      [title, notes || null, due_date || null, priority || 'p2']
+    );
+    res.json({ ok: true, task: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/tasks', async (req, res) => {
   const { title, notes, due_date, priority, category, tag, recurring } = req.body;
   try {
