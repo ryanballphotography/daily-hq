@@ -111,6 +111,7 @@ async function editTask(id) {
   document.getElementById('m-title').value = t.title;
   document.getElementById('m-notes').value = t.notes || '';
   document.getElementById('m-due').value = t.due_date ? t.due_date.split('T')[0] : '';
+  document.getElementById('m-time').value = t.time_block || '';
   document.getElementById('m-priority').value = t.priority || 'p3';
   document.getElementById('m-category').value = t.category || 'work';
   document.getElementById('m-recurring').value = t.recurring || '';
@@ -373,6 +374,7 @@ async function saveModal() {
         title,
         notes: document.getElementById('m-notes').value,
         due_date: due || null,
+        time_block: document.getElementById('m-time').value || null,
         priority: document.getElementById('m-priority').value,
         category: document.getElementById('m-category').value,
         recurring: document.getElementById('m-recurring').value,
@@ -616,6 +618,7 @@ function acceptProposal(i) {
   document.getElementById('m-title').value = p.suggestedTask;
   document.getElementById('m-notes').value = p.action + ' (from: ' + p.from + ')';
   document.getElementById('m-due').value = '';
+  document.getElementById('m-time').value = '';
   document.getElementById('m-priority').value = p.priority || 'p3';
   document.getElementById('m-category').value = 'work';
   document.getElementById('m-recurring').value = '';
