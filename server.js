@@ -739,7 +739,7 @@ async function sendEmail(subject, body) {
       subject,
       text: body
     });
-  } catch(e) { console.error('Email error:', e.message); }
+  } catch(e) { console.error('Email error:', e.message, e.code, e.response); }
 }
 
 async function checkReminders() {
