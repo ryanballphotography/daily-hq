@@ -1025,3 +1025,5 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .mkt-stage-badge i { font-size: 11px; }
 .mkt-row-advance { width: 22px; height: 22px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--text); color: var(--bg); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; padding: 0; flex-shrink: 0; }
 .mkt-row-advance:hover { opacity: 0.85; }
+
+.task-time { font-size: 11px; color: var(--text2); background: var(--bg2); border-radius: 4px; padding: 1px 6px; }
