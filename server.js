@@ -737,6 +737,7 @@ async function checkReminders() {
       `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block > $2 AND time_block <= $3`,
       [todayStr, nowStr, in30Str]
     );
+    console.log('Tasks found:', res.rows.length, res.rows.map(t => t.title + ' ' + t.time_block));
     for (const task of res.rows) {
       await sendPushover(task.title, '⏰ Due at ' + task.time_block);
       console.log('Reminder sent for:', task.title);
