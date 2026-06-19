@@ -729,14 +729,19 @@ async function checkReminders() {
   try {
     const now = new Date();
     const in30 = new Date(now.getTime() + 30 * 60 * 1000);
-    const nowStr = now.toTimeString().slice(0,5);
-    const in30Str = in30.toTimeString().slice(0,5);
-    const todayStr = now.toISOString().split('T')[0];
+    // Use local time strings (BST) to match how time_block is stored
+    const pad = n => String(n).padStart(2,'0');
+    const nowStr = pad(now.getHours()) + ':' + pad(now.getMinutes());
+    const in30Str = pad(in30.getHours()) + ':' + pad(in30.getMinutes());
+    const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayStr = todayLocal.getFullYear() + '-' + pad(todayLocal.getMonth()+1) + '-' + pad(todayLocal.getDate());
     console.log('Reminder window:', todayStr, nowStr, '->', in30Str);
     const res = await pool.query(
       `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block > $2 AND time_block <= $3`,
       [todayStr, nowStr, in30Str]
     );
+    const allTimed = await pool.query("SELECT title, time_block, due_date FROM tasks WHERE done = false AND time_block IS NOT NULL");
+    console.log('All timed tasks:', JSON.stringify(allTimed.rows));
     console.log('Tasks found:', res.rows.length, res.rows.map(t => t.title + ' ' + t.time_block));
     for (const task of res.rows) {
       await sendPushover(task.title, '⏰ Due at ' + task.time_block);
