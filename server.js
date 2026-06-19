@@ -706,4 +706,45 @@ app.patch("/api/marketing-content/:id", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
+// ── Pushover reminder cron ─────────────────────────
+async function sendPushover(message, title) {
+  try {
+    await fetch('https://api.pushover.net/1/messages.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: process.env.PUSHOVER_TOKEN,
+        user: process.env.PUSHOVER_USER,
+        title: title || 'Daily HQ',
+        message,
+        priority: 1,
+        sound: 'pushover'
+      })
+    });
+  } catch(e) { console.error('Pushover error:', e.message); }
+}
+
+async function checkReminders() {
+  try {
+    const now = new Date();
+    const in30 = new Date(now.getTime() + 30 * 60 * 1000);
+    const nowStr = now.toTimeString().slice(0,5);
+    const in30Str = in30.toTimeString().slice(0,5);
+    const todayStr = now.toISOString().split('T')[0];
+    const res = await pool.query(
+      `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block > $2 AND time_block <= $3`,
+      [todayStr, nowStr, in30Str]
+    );
+    for (const task of res.rows) {
+      await sendPushover(task.title, '⏰ Due at ' + task.time_block);
+      console.log('Reminder sent for:', task.title);
+    }
+  } catch(e) { console.error('Reminder check error:', e.message); }
+}
+
+// Run every 15 minutes
+setInterval(checkReminders, 15 * 60 * 1000);
+// Also run on startup
+checkReminders();
+
 initDB().then(() => app.listen(PORT, () => console.log(`Daily HQ running on ${PORT}`)));
