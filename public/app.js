@@ -385,6 +385,7 @@ async function saveModal() {
       t.title = title;
       t.notes = document.getElementById('m-notes').value;
       t.due_date = due || null;
+      t.time_block = document.getElementById('m-time').value || null;
       t.priority = document.getElementById('m-priority').value;
       t.category = document.getElementById('m-category').value;
       t.recurring = document.getElementById('m-recurring').value;
