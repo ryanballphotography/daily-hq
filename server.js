@@ -230,6 +230,7 @@ async function initDB() {
   `);
   // Add time_block column if it doesn't exist (for existing DBs)
   await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time_block VARCHAR(20) DEFAULT NULL`);
+  await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ DEFAULT NULL`);
   await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
   await pool.query(`CREATE TABLE IF NOT EXISTS shoot_tasks (
     id SERIAL PRIMARY KEY,
@@ -757,18 +758,29 @@ async function checkReminders() {
     const in30Str = pad(bstIn30.getUTCHours()) + ':' + pad(bstIn30.getUTCMinutes());
     const todayStr = bstNow.toISOString().split('T')[0];
     console.log('Reminder window:', todayStr, nowStr, '->', in30Str);
+    // Due within 30 mins, no reminder sent yet or last reminder > 35 mins ago
     const res = await pool.query(
-      `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block > $2 AND time_block <= $3`,
+      `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block > $2 AND time_block <= $3
+       AND (reminder_sent_at IS NULL OR reminder_sent_at < NOW() - INTERVAL '35 minutes')`,
       [todayStr, nowStr, in30Str]
     );
-    console.log('Reminder window:', todayStr, nowStr, '->', in30Str);
-    console.log('Tasks found:', res.rows.length, res.rows.map(t => t.title + ' ' + t.time_block));
-    console.log('Reminder window:', todayStr, nowStr, '->', in30Str);
     console.log('Tasks found:', res.rows.length, res.rows.map(t => t.title + ' ' + t.time_block));
     for (const task of res.rows) {
       await sendPushover(task.title, '⏰ Due at ' + task.time_block);
-      await sendEmail('⏰ ' + task.title + ' at ' + task.time_block, 'Reminder: ' + task.title + ' is due at ' + task.time_block + ' today.');
+      await pool.query('UPDATE tasks SET reminder_sent_at = NOW() WHERE id = $1', [task.id]);
       console.log('Reminder sent for:', task.title);
+    }
+    // 10 mins overdue and not done
+    const tenAgoStr = pad((bstNow.getUTCHours() * 60 + bstNow.getUTCMinutes() - 10) / 60 | 0) + ':' + pad((bstNow.getUTCHours() * 60 + bstNow.getUTCMinutes() - 10) % 60);
+    const overdueRes = await pool.query(
+      `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block >= $2 AND time_block < $3
+       AND (reminder_sent_at IS NULL OR reminder_sent_at < NOW() - INTERVAL '15 minutes')`,
+      [todayStr, tenAgoStr, nowStr]
+    );
+    for (const task of overdueRes.rows) {
+      await sendPushover(task.title + ' — still not done!', '🔴 Overdue');
+      await pool.query('UPDATE tasks SET reminder_sent_at = NOW() WHERE id = $1', [task.id]);
+      console.log('Overdue reminder sent for:', task.title);
     }
   } catch(e) { console.error('Reminder check error:', e.message); }
 }
