@@ -725,6 +725,7 @@ async function sendPushover(message, title) {
 }
 
 async function checkReminders() {
+  console.log('Checking reminders at', new Date().toISOString());
   try {
     const now = new Date();
     const in30 = new Date(now.getTime() + 30 * 60 * 1000);
