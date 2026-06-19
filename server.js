@@ -732,6 +732,7 @@ async function checkReminders() {
     const nowStr = now.toTimeString().slice(0,5);
     const in30Str = in30.toTimeString().slice(0,5);
     const todayStr = now.toISOString().split('T')[0];
+    console.log('Reminder window:', todayStr, nowStr, '->', in30Str);
     const res = await pool.query(
       `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block > $2 AND time_block <= $3`,
       [todayStr, nowStr, in30Str]
