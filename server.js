@@ -745,7 +745,9 @@ async function checkReminders() {
 
 // Run every 15 minutes
 setInterval(checkReminders, 15 * 60 * 1000);
-// Also run on startup
-checkReminders();
 
-initDB().then(() => app.listen(PORT, () => console.log(`Daily HQ running on ${PORT}`)));
+initDB().then(() => {
+  app.listen(PORT, () => console.log(`Daily HQ running on ${PORT}`));
+  // Run after DB is ready
+  checkReminders();
+});
