@@ -729,12 +729,13 @@ async function checkReminders() {
   try {
     const now = new Date();
     const in30 = new Date(now.getTime() + 30 * 60 * 1000);
-    // Use local time strings (BST) to match how time_block is stored
     const pad = n => String(n).padStart(2,'0');
-    const nowStr = pad(now.getHours()) + ':' + pad(now.getMinutes());
-    const in30Str = pad(in30.getHours()) + ':' + pad(in30.getMinutes());
-    const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayStr = todayLocal.getFullYear() + '-' + pad(todayLocal.getMonth()+1) + '-' + pad(todayLocal.getDate());
+    // Convert UTC to BST (UTC+1) for comparison with stored time_block values
+    const bstNow = new Date(now.getTime() + 60 * 60 * 1000);
+    const bstIn30 = new Date(in30.getTime() + 60 * 60 * 1000);
+    const nowStr = pad(bstNow.getUTCHours()) + ':' + pad(bstNow.getUTCMinutes());
+    const in30Str = pad(bstIn30.getUTCHours()) + ':' + pad(bstIn30.getUTCMinutes());
+    const todayStr = bstNow.toISOString().split('T')[0];
     console.log('Reminder window:', todayStr, nowStr, '->', in30Str);
     const res = await pool.query(
       `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block > $2 AND time_block <= $3`,
