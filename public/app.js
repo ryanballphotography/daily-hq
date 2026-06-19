@@ -132,6 +132,7 @@ function taskHTML(t) {
           <span class="tag tag-${cat}">${cat}</span>
           ${t.tag ? '<span class="tag">' + t.tag + '</span>' : ''}
           ${t.due_date ? '<span class="task-date ' + (od ? 'overdue' : '') + '">' + (od ? '⚠ ' : '') + formatDate(t.due_date) + '</span>' : ''}
+          ${t.time_block ? '<span class="task-time">🕐 ' + t.time_block + '</span>' : ''}
           ${t.recurring ? '<span class="tag">↻ ' + t.recurring + '</span>' : ''}
         </div>
       </div>
