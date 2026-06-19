@@ -718,6 +718,10 @@ async function sendPushover(message, title) {
         title: title || 'Daily HQ',
         message,
         priority: 1,
+        retry: 60,
+        expire: 3600,
+        retry: 60,
+        expire: 3600,
         sound: 'pushover'
       })
     });
