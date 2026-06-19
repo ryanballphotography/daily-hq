@@ -720,12 +720,26 @@ async function sendPushover(message, title) {
         priority: 1,
         retry: 60,
         expire: 3600,
-        retry: 60,
-        expire: 3600,
         sound: 'pushover'
       })
     });
   } catch(e) { console.error('Pushover error:', e.message); }
+}
+
+async function sendEmail(subject, body) {
+  try {
+    const nodemailer = require('nodemailer');
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user: process.env.GMAIL_USER, pass: process.env.GMAIL_PASS }
+    });
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: process.env.GMAIL_USER,
+      subject,
+      text: body
+    });
+  } catch(e) { console.error('Email error:', e.message); }
 }
 
 async function checkReminders() {
@@ -745,11 +759,9 @@ async function checkReminders() {
       `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block > $2 AND time_block <= $3`,
       [todayStr, nowStr, in30Str]
     );
-    const allTimed = await pool.query("SELECT title, time_block, due_date FROM tasks WHERE done = false AND time_block IS NOT NULL");
-    console.log('All timed tasks:', JSON.stringify(allTimed.rows));
-    console.log('Tasks found:', res.rows.length, res.rows.map(t => t.title + ' ' + t.time_block));
     for (const task of res.rows) {
       await sendPushover(task.title, '⏰ Due at ' + task.time_block);
+      await sendEmail('⏰ ' + task.title + ' at ' + task.time_block, 'Reminder: ' + task.title + ' is due at ' + task.time_block + ' today.');
       console.log('Reminder sent for:', task.title);
     }
   } catch(e) { console.error('Reminder check error:', e.message); }
