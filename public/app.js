@@ -1,3 +1,14 @@
+// Redirect to login on expired session
+const _nativeFetch = window.fetch;
+window.fetch = async function(...args) {
+  const res = await _nativeFetch(...args);
+  if (res.status === 401) {
+    window.location.href = '/login';
+    throw new Error('Session expired — redirecting to login');
+  }
+  return res;
+};
+
 const today = (() => {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
