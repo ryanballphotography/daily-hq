@@ -538,50 +538,11 @@ const DEFAULT_SHOOT_TASKS = [
   'Invoice Client'
 ];
 
-app.get("/api/shoot-tasks/:shootId", async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT * FROM shoot_tasks WHERE shoot_id = $1 ORDER BY sort_order ASC, id ASC',
-      [req.params.shootId]
-    );
-    res.json(result.rows);
-  } catch(err) { res.status(500).json({error: err.message}); }
-});
-
-app.post("/api/shoot-tasks/:shootId/generate", async (req, res) => {
-  const { shootName } = req.body;
-  try {
-    // Check if tasks already exist
-    const existing = await pool.query('SELECT id FROM shoot_tasks WHERE shoot_id = $1', [req.params.shootId]);
-    if (existing.rows.length > 0) return res.json({ skipped: true, message: 'Tasks already exist' });
-    // Insert default tasks
-    for (let i = 0; i < DEFAULT_SHOOT_TASKS.length; i++) {
-      await pool.query(
-        'INSERT INTO shoot_tasks (shoot_id, shoot_name, title, sort_order) VALUES ($1, $2, $3, $4)',
-        [req.params.shootId, shootName, DEFAULT_SHOOT_TASKS[i], i]
-      );
-    }
-    const result = await pool.query('SELECT * FROM shoot_tasks WHERE shoot_id = $1 ORDER BY sort_order ASC', [req.params.shootId]);
-    res.json(result.rows);
-  } catch(err) { res.status(500).json({error: err.message}); }
-});
-
 app.patch("/api/shoot-tasks/:id/complete", async (req, res) => {
   try {
     const result = await pool.query(
       'UPDATE shoot_tasks SET done = NOT done, completed_at = CASE WHEN done THEN NULL ELSE NOW() END WHERE id = $1 RETURNING *',
       [req.params.id]
-    );
-    res.json(result.rows[0]);
-  } catch(err) { res.status(500).json({error: err.message}); }
-});
-
-app.patch("/api/shoot-tasks/:id", async (req, res) => {
-  const { due_date } = req.body;
-  try {
-    const result = await pool.query(
-      'UPDATE shoot_tasks SET due_date = $1 WHERE id = $2 RETURNING *',
-      [due_date || null, req.params.id]
     );
     res.json(result.rows[0]);
   } catch(err) { res.status(500).json({error: err.message}); }
