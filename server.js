@@ -283,6 +283,8 @@ async function initDB() {
   console.log('DB ready');
 }
 
+app.get('/api/ping', (req, res) => res.json({ ok: true }));
+
 app.get('/api/tasks', async (req, res) => {
   try {
     const result = await pool.query(`
