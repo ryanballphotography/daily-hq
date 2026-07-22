@@ -48,6 +48,32 @@ function generateToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+// ── Trusted-device cookie (7-day TOTP skip) ──────
+const TRUSTED_SECRET = process.env.HQ_SESSION_SECRET || process.env.HQ_PASSWORD;
+
+function signTrustedCookie() {
+  const ts = Date.now().toString();
+  const sig = crypto.createHmac('sha256', TRUSTED_SECRET).update(ts).digest('hex');
+  return `${ts}.${sig}`;
+}
+
+function verifyTrustedCookie(value) {
+  if (!value) return false;
+  const parts = value.split('.');
+  if (parts.length !== 2) return false;
+  const [ts, sig] = parts;
+  if (!/^\d+$/.test(ts)) return false;
+  try {
+    const expected = crypto.createHmac('sha256', TRUSTED_SECRET).update(ts).digest('hex');
+    const sigBuf = Buffer.from(sig, 'hex');
+    const expBuf = Buffer.from(expected, 'hex');
+    if (sigBuf.length !== expBuf.length) return false;
+    if (!crypto.timingSafeEqual(sigBuf, expBuf)) return false;
+  } catch(e) { return false; }
+  const age = Date.now() - parseInt(ts);
+  return age >= 0 && age < 7 * 24 * 60 * 60 * 1000;
+}
+
 // ── Rate limiting ────────────────────────────────
 const loginAttempts = {};
 function rateLimit(req, res, next) {
@@ -137,6 +163,16 @@ app.post('/login', rateLimit, express.urlencoded({ extended: false }), async (re
   if (!validPass || username !== validUser || password !== validPass) {
     return res.redirect('/login?error=1');
   }
+  // Trusted device — skip TOTP
+  if (verifyTrustedCookie(req.cookies['sp_trusted'])) {
+    const sessionToken = generateToken();
+    await pool.query(
+      "INSERT INTO hq_sessions (token, expires_at, verified) VALUES ($1, NOW() + INTERVAL '24 hours', true)",
+      [sessionToken]
+    );
+    res.cookie('hq_token', sessionToken, { httpOnly: true, secure: true, maxAge: 86400000 });
+    return res.redirect('/');
+  }
   // Password correct — issue temp token for 2FA step
   const tempToken = generateToken();
   await pool.query(
@@ -206,7 +242,16 @@ app.post('/login/verify', rateLimit, express.urlencoded({ extended: false }), as
 
   res.clearCookie('hq_temp');
   res.cookie('hq_token', sessionToken, { httpOnly: true, secure: true, maxAge: 86400000 });
+  res.cookie('sp_trusted', signTrustedCookie(), { httpOnly: true, secure: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
   res.redirect('/');
+});
+
+app.post('/logout', async (req, res) => {
+  const token = req.cookies['hq_token'];
+  if (token) await pool.query("DELETE FROM hq_sessions WHERE token = $1", [token]);
+  res.clearCookie('hq_token');
+  res.clearCookie('sp_trusted');
+  res.redirect('/login');
 });
 
 async function initDB() {
