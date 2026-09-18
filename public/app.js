@@ -673,7 +673,7 @@ function showInboxPrompt() {
   const el = document.getElementById('inbox-proposals');
   if (!el) return;
   if (el._loaded) return;
-  el.innerHTML = '<div style="text-align:center;padding:3rem 1rem;"><div style="font-size:13px;color:var(--text2);margin-bottom:1rem;">Check your inbox for emails needing action</div><button onclick="loadInbox()" class="btn-add">Check emails</button></div>';
+  el.innerHTML = '<div class="empty-state"><i class="ti ti-mail"></i><div class="empty-state-text">Check your inbox for emails needing action</div><button onclick="loadInbox()" class="btn-add">Check emails</button></div>';
 }
 
 async function loadInbox(reset = false) {
