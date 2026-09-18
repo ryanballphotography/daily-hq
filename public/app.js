@@ -1386,6 +1386,30 @@ async function completeTaskWeekly(id) {
 
 
 // ── Pull to refresh ───────────────────────────────────────────────────────────
+// The app shell doesn't scroll on mobile (body has overflow:hidden) — each
+// .view scrolls internally instead. window.scrollY is therefore always 0, so
+// checking that for "am I at the top" used to arm this on every downward
+// swipe, anywhere, even mid-scroll through a list — and firing a full
+// location.reload() then dumped you back on the default Inbox tab regardless
+// of what you were looking at. Check the actual scroll host, and refresh data
+// in place instead of reloading the page.
+async function refreshCurrentView() {
+  await loadTasks();
+  const visible = document.querySelector('.view:not(.hidden)');
+  const view = visible ? visible.id.replace('view-', '') : 'inbox';
+  if (view === 'all') renderAll();
+  if (view === 'completed') renderCompleted();
+  if (view === 'calendar') showCalendarView();
+  if (view === 'inbox') { showInboxPrompt(); renderInboxTimeline(); }
+  if (view === 'scheduled') renderScheduled();
+  if (view === 'weekly') renderWeekly();
+  if (view === 'marketing') {
+    await loadContacts();
+    renderMarketing();
+    await loadMarketingContent().then(renderMktContent);
+  }
+}
+
 (function() {
   if (window.innerWidth > 768) return;
   let startY = 0;
@@ -1395,9 +1419,13 @@ async function completeTaskWeekly(id) {
   indicator.innerHTML = '<i class="ti ti-refresh"></i>';
   document.body.appendChild(indicator);
 
+  function scrollHost() {
+    return document.querySelector('.view:not(.hidden)') || document.scrollingElement;
+  }
+
   document.addEventListener('touchstart', e => {
     startY = e.touches[0].clientY;
-    pulling = window.scrollY === 0;
+    pulling = scrollHost().scrollTop === 0;
   }, { passive: true });
 
   document.addEventListener('touchmove', e => {
@@ -1412,7 +1440,10 @@ async function completeTaskWeekly(id) {
     indicator.classList.remove('visible');
     if (pulling && diff > 60) {
       indicator.innerHTML = '<i class="ti ti-loader"></i>';
-      setTimeout(() => location.reload(), 300);
+      refreshCurrentView().finally(() => {
+        indicator.classList.remove('visible');
+        indicator.innerHTML = '<i class="ti ti-refresh"></i>';
+      });
     }
     pulling = false;
   });
