@@ -143,16 +143,16 @@ app.get('/login', (req, res) => {
   <title>Daily HQ — Login</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-    .card { background: #1a1a1a; border: 0.5px solid #2a2a2a; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; }
-    .logo { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 4px; }
-    .sub { font-size: 12px; color: #666; margin-bottom: 2rem; }
-    label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #666; display: block; margin-bottom: 6px; }
-    input { width: 100%; padding: 10px 12px; background: #111; border: 0.5px solid #2a2a2a; border-radius: 8px; color: #e0e0e0; font-size: 14px; outline: none; margin-bottom: 1rem; }
-    input:focus { border-color: #444; }
-    button { width: 100%; padding: 11px; background: #fff; color: #000; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
-    button:hover { opacity: 0.9; }
-    .error { font-size: 13px; color: #e05555; margin-bottom: 1rem; background: #2a1010; padding: 8px 12px; border-radius: 6px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #14100e; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #1c1815; border: 0.5px solid #2e2823; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; }
+    .logo { font-size: 20px; font-weight: 600; color: #2DD4BF; margin-bottom: 4px; }
+    .sub { font-size: 12px; color: #7a736c; margin-bottom: 2rem; }
+    label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #7a736c; display: block; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; background: #14100e; border: 0.5px solid #2e2823; border-radius: 8px; color: #e0e0e0; font-size: 14px; outline: none; margin-bottom: 1rem; transition: border-color 0.15s, box-shadow 0.15s; }
+    input:focus { border-color: #2DD4BF; box-shadow: 0 0 0 3px rgba(45,212,191,0.14); }
+    button { width: 100%; padding: 11px; background: #2DD4BF; color: #0A2E29; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    button:hover { background: #5EE6D3; }
+    .error { font-size: 13px; color: #ff8a8a; margin-bottom: 1rem; background: #2e1414; padding: 8px 12px; border-radius: 6px; }
   </style>
 </head>
 <body>
@@ -206,18 +206,18 @@ app.get('/login/2fa', (req, res) => {
   <title>Daily HQ — 2FA</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-    .card { background: #1a1a1a; border: 0.5px solid #2a2a2a; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; }
-    .logo { font-size: 20px; font-weight: 600; color: #fff; margin-bottom: 4px; }
-    .sub { font-size: 13px; color: #888; margin-bottom: 2rem; line-height: 1.5; }
-    label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #666; display: block; margin-bottom: 6px; }
-    input { width: 100%; padding: 10px 12px; background: #111; border: 0.5px solid #2a2a2a; border-radius: 8px; color: #e0e0e0; font-size: 20px; letter-spacing: .2em; outline: none; margin-bottom: 1rem; text-align: center; }
-    input:focus { border-color: #444; }
-    button { width: 100%; padding: 11px; background: #fff; color: #000; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; }
-    button:hover { opacity: 0.9; }
-    .error { font-size: 13px; color: #e05555; margin-bottom: 1rem; background: #2a1010; padding: 8px 12px; border-radius: 6px; }
-    .back { text-align: center; margin-top: 1rem; font-size: 12px; color: #666; }
-    .back a { color: #888; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #14100e; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .card { background: #1c1815; border: 0.5px solid #2e2823; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; }
+    .logo { font-size: 20px; font-weight: 600; color: #2DD4BF; margin-bottom: 4px; }
+    .sub { font-size: 13px; color: #928a82; margin-bottom: 2rem; line-height: 1.5; }
+    label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #7a736c; display: block; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; background: #14100e; border: 0.5px solid #2e2823; border-radius: 8px; color: #e0e0e0; font-size: 20px; letter-spacing: .2em; outline: none; margin-bottom: 1rem; text-align: center; transition: border-color 0.15s, box-shadow 0.15s; }
+    input:focus { border-color: #2DD4BF; box-shadow: 0 0 0 3px rgba(45,212,191,0.14); }
+    button { width: 100%; padding: 11px; background: #2DD4BF; color: #0A2E29; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+    button:hover { background: #5EE6D3; }
+    .error { font-size: 13px; color: #ff8a8a; margin-bottom: 1rem; background: #2e1414; padding: 8px 12px; border-radius: 6px; }
+    .back { text-align: center; margin-top: 1rem; font-size: 12px; color: #7a736c; }
+    .back a { color: #2DD4BF; }
   </style>
 </head>
 <body>

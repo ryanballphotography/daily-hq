@@ -16,6 +16,13 @@
   --exercise: #3B6D11;
   --home: #854F0B;
   --personal: #533AB7;
+  /* Brand accent — used for primary actions, the active nav item, and focus
+     rings. Distinct from every category/priority hue so it never doubles up
+     as a status colour. */
+  --accent: #0A7267;
+  --accent-hover: #085A52;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(10,114,103,0.1);
   --radius: 8px;
   --radius-lg: 12px;
 }
@@ -32,6 +39,10 @@
   --p1: #FF6B6A;
   --p2: #FFA040;
   --p3: #4A90D9;
+  --accent: #2DD4BF;
+  --accent-hover: #5EE6D3;
+  --accent-ink: #0A2E29;
+  --accent-soft: rgba(45,212,191,0.14);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -47,6 +58,10 @@
     --p1: #FF6B6A;
     --p2: #FFA040;
     --p3: #4A90D9;
+    --accent: #2DD4BF;
+    --accent-hover: #5EE6D3;
+    --accent-ink: #0A2E29;
+    --accent-soft: rgba(45,212,191,0.14);
   }
 }
 
@@ -77,12 +92,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .shell { display: flex; height: 100vh; }
 
 .sidebar { width: 200px; min-width: 200px; background: var(--bg2); border-right: 0.5px solid var(--border); display: flex; flex-direction: column; padding: 1rem 0; overflow-y: auto; }
-.logo { padding: 0 1rem 1rem; font-size: 15px; font-weight: 500; border-bottom: 0.5px solid var(--border); margin-bottom: 0.5rem; }
+.logo { padding: 0 1rem 1rem; font-size: 15px; font-weight: 600; color: var(--accent); border-bottom: 0.5px solid var(--border); margin-bottom: 0.5rem; }
 .logo span { font-size: 11px; color: var(--text3); display: block; font-weight: 400; margin-top: 2px; }
 .ns { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); padding: 10px 1rem 3px; }
-.ni { display: flex; align-items: center; gap: 8px; padding: 7px 1rem; font-size: 13px; color: var(--text2); cursor: pointer; border-left: 2px solid transparent; }
+.ni { display: flex; align-items: center; gap: 8px; padding: 7px 1rem; font-size: 13px; color: var(--text2); cursor: pointer; border-left: 2px solid transparent; transition: color 0.15s, border-color 0.15s; }
 .ni:hover { background: var(--bg); color: var(--text); }
-.ni.active { background: var(--bg); color: var(--text); font-weight: 500; border-left-color: var(--text); }
+.ni.active { background: var(--bg); color: var(--accent); font-weight: 500; border-left-color: var(--accent); }
 .ni i { font-size: 15px; }
 .nb { font-size: 10px; padding: 1px 6px; border-radius: 20px; background: #FCEBEB; color: #A32D2D; margin-left: auto; }
 
@@ -90,8 +105,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .topbar { padding: 0.75rem 1.25rem; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; gap: 12px; }
 .topbar-title { font-size: 15px; font-weight: 500; }
 .topbar-date { font-size: 13px; color: var(--text3); flex: 1; }
-.btn-add { font-size: 13px; padding: 6px 12px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--text); color: var(--bg); cursor: pointer; display: flex; align-items: center; gap: 6px; }
-.btn-add:hover { opacity: 0.85; }
+.btn-add { font-size: 13px; padding: 6px 12px; border: none; border-radius: var(--radius); background: var(--accent); color: var(--accent-ink); cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.15s; }
+.btn-add:hover { background: var(--accent-hover); }
 
 .view { flex: 1; overflow-y: auto; padding: 1.25rem; }
 .hidden { display: none; }
@@ -108,11 +123,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .task.done .task-title { text-decoration: line-through; color: var(--text3); }
 
 .check { width: 17px; height: 17px; border-radius: 50%; border: 1.5px solid var(--border2); flex-shrink: 0; margin-top: 2px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
-.check:hover { border-color: var(--text); }
+.check:hover { border-color: var(--accent); }
 .check.p1 { border-color: var(--p1); }
 .check.p2 { border-color: var(--p2); }
 .check.p3 { border-color: var(--p3); }
-.check.checked { background: var(--text); border-color: var(--text); color: white; font-size: 11px; }
+.check.checked { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-size: 11px; }
 
 .task-body { flex: 1; min-width: 0; }
 .task-title { font-size: 13px; color: var(--text); line-height: 1.4; }
@@ -146,7 +161,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 .chat-input-row { display: flex; gap: 8px; padding-top: 1rem; border-top: 0.5px solid var(--border); margin-top: auto; }
 .chat-input-row input { flex: 1; font-size: 13px; height: 38px; border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 0 12px; background: var(--bg); color: var(--text); outline: none; }
-.chat-input-row input:focus { border-color: var(--text); }
+.chat-input-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .send-btn { width: 38px; height: 38px; border-radius: var(--radius); background: var(--text); border: none; color: white; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 .send-btn:hover { opacity: 0.85; }
 
@@ -157,15 +172,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .modal-title { font-size: 15px; font-weight: 500; margin-bottom: 1.25rem; }
 .modal-field { margin-bottom: 0.875rem; }
 .modal-field label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); display: block; margin-bottom: 4px; }
-.modal-field input, .modal-field select, .modal-field textarea { width: 100%; font-size: 13px; border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 7px 10px; background: var(--bg); color: var(--text); font-family: inherit; outline: none; }
-.modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus { border-color: var(--text); }
+.modal-field input, .modal-field select, .modal-field textarea { width: 100%; font-size: 13px; border: 0.5px solid var(--border2); border-radius: var(--radius); padding: 7px 10px; background: var(--bg); color: var(--text); font-family: inherit; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+.modal-field input:focus, .modal-field select:focus, .modal-field textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .modal-field textarea { resize: none; height: 70px; }
 .modal-row { display: flex; gap: 12px; }
 .modal-row .modal-field { flex: 1; }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1.25rem; }
 .btn-cancel { font-size: 13px; padding: 7px 16px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: transparent; color: var(--text2); cursor: pointer; }
-.btn-save { font-size: 13px; padding: 7px 16px; border: none; border-radius: var(--radius); background: var(--text); color: white; cursor: pointer; }
-.btn-save:hover { opacity: 0.85; }
+.btn-save { font-size: 13px; padding: 7px 16px; border: none; border-radius: var(--radius); background: var(--accent); color: var(--accent-ink); cursor: pointer; transition: background 0.15s; }
+.btn-save:hover { background: var(--accent-hover); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; }
 .modal-header .modal-title { margin-bottom: 0; }
 .modal-header .modal-actions { margin-top: 0; }
@@ -184,8 +199,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .inbox-subject { font-size: 13px; color: var(--text); margin-bottom: 6px; }
 .inbox-action { font-size: 12px; color: var(--text2); line-height: 1.5; margin-bottom: 12px; }
 .inbox-buttons { display: flex; gap: 8px; }
-.inbox-btn-accept { font-size: 12px; padding: 6px 14px; border: none; border-radius: var(--radius); background: var(--text); color: white; cursor: pointer; }
-.inbox-btn-accept:hover { opacity: 0.85; }
+.inbox-btn-accept { font-size: 12px; padding: 6px 14px; border: none; border-radius: var(--radius); background: var(--accent); color: var(--accent-ink); cursor: pointer; transition: background 0.15s; }
+.inbox-btn-accept:hover { background: var(--accent-hover); }
 .inbox-btn-skip { font-size: 12px; padding: 6px 14px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: transparent; color: var(--text2); cursor: pointer; }
 .inbox-btn-skip:hover { background: var(--bg2); }
 
@@ -254,8 +269,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .wgb-day-summary { font-size: 10px; color: var(--text3); margin-top: 4px; line-height: 1.3; }
 
 /* ── Floating chat ── */
-.chat-fab { position: fixed; bottom: 24px; right: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--text); border: none; color: var(--bg); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 200; transition: transform 0.15s; }
-.chat-fab:hover { transform: scale(1.05); }
+.chat-fab { position: fixed; bottom: 24px; right: 24px; width: 52px; height: 52px; border-radius: 50%; background: var(--accent); border: none; color: var(--accent-ink); font-size: 22px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.25); z-index: 200; transition: transform 0.15s, background 0.15s; }
+.chat-fab:hover { transform: scale(1.05); background: var(--accent-hover); }
 .chat-panel { position: fixed; bottom: 88px; right: 24px; width: 360px; height: 500px; background: var(--bg); border: 0.5px solid var(--border2); border-radius: var(--radius-lg); box-shadow: 0 8px 32px rgba(0,0,0,0.15); z-index: 200; display: flex; flex-direction: column; overflow: hidden; }
 .chat-panel.hidden { display: none; }
 .chat-panel-header { padding: 12px 16px; border-bottom: 0.5px solid var(--border); display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 500; }
@@ -335,7 +350,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
   /* Floating add-task button — fixed on screen regardless of scroll, opposite
      corner from the chat FAB */
-  .task-fab { position: fixed; bottom: 72px; left: 16px; width: 46px; height: 46px; border-radius: 50%; background: var(--text); border: none; color: var(--bg); font-size: 20px; cursor: pointer; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 200; }
+  .task-fab { position: fixed; bottom: 72px; left: 16px; width: 46px; height: 46px; border-radius: 50%; background: var(--accent); border: none; color: var(--accent-ink); font-size: 20px; cursor: pointer; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.25); z-index: 200; }
 
   /* Weekly grid */
   .week-day-cards { grid-template-columns: repeat(7, 160px); overflow-x: auto; padding-bottom: 8px; }
@@ -377,27 +392,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   .modal-body .modal-field:has(textarea) { display: none; }
   /* Hide old bottom actions — save is in header on mobile */
   .modal > .modal-actions { display: none; }
-}
-
-[data-theme="dark"] .inbox-btn-accept,
-[data-theme="dark"] .btn-add,
-[data-theme="dark"] .btn-save {
-  background: #f0f0f0;
-  color: #1a1a1a;
-}
-
-[data-theme="dark"] .inbox-btn-accept,
-[data-theme="dark"] .btn-add,
-[data-theme="dark"] .btn-save {
-  background: #f0f0f0;
-  color: #1a1a1a;
-}
-
-[data-theme="dark"] .inbox-btn-accept,
-[data-theme="dark"] .btn-add,
-[data-theme="dark"] .btn-save {
-  background: #f0f0f0;
-  color: #1a1a1a;
 }
 
 /* ── Shoots view ── */
