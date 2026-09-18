@@ -236,18 +236,14 @@
     </div>
   </div>
 
-  <!-- Floating add-task button (mobile only — the topbar button is out of
-       thumb reach once you've scrolled, this stays fixed on screen) -->
-  <button class="task-fab mobile-only" id="task-fab" onclick="openModal()" title="Add task">
+  <!-- Floating add-task button (the topbar button is out of thumb reach on
+       mobile once you've scrolled, this stays fixed on screen everywhere) -->
+  <button class="task-fab" id="task-fab" onclick="openModal()" title="Add task">
     <i class="ti ti-plus"></i>
   </button>
 
-  <!-- Floating chat button -->
-  <button class="chat-fab" id="chat-fab" onclick="toggleChat()" title="PA Chat">
-    <i class="ti ti-message-circle"></i>
-  </button>
-
-  <!-- Chat panel -->
+  <!-- Chat panel — no floating entry point any more (unused); still opens
+       from Chat History when reopening a past conversation. -->
   <div class="chat-panel hidden" id="chat-panel">
     <div class="chat-panel-header">
       <span>PA Chat</span>

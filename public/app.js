@@ -14,6 +14,15 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') fetch('/api/ping');
 });
 
+// Native date/time inputs only open their picker if the click lands on the
+// tiny calendar-icon hit target. Force it open on any click in the field.
+document.addEventListener('click', e => {
+  const el = e.target;
+  if (el.matches && el.matches('input[type="date"], input[type="time"]') && el.showPicker) {
+    try { el.showPicker(); } catch (err) {}
+  }
+});
+
 const today = (() => {
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -466,6 +475,13 @@ function applyPickedDate() {
     titleEl.value = titleEl.value.replace(pickerInsertion, '').trim();
     pickerInsertion = null;
   }
+  // The sentence may already contain its own natural-language date (e.g.
+  // "friday") from before the manual picker was touched. Without stripping
+  // it, the picker's choice and the typed one both stay in the text and
+  // disagree about the due date — chrono keeps whichever comes first and
+  // silently drops the manual pick. Manually picking a date always wins.
+  const existingParse = parseTask(titleEl.value);
+  if (existingParse.dueAt) titleEl.value = existingParse.title;
   if (dateVal) {
     pickerInsertion = dateVal + (timeVal ? ' ' + timeVal : '');
     titleEl.value = (titleEl.value ? titleEl.value + ' ' : '') + pickerInsertion;
