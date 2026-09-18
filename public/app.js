@@ -30,8 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
   bindNav();
   bindModal();
   bindChat();
+  bindQuickAdd();
   showInboxPrompt();
-  loadInboxCalendar();
+  renderInboxTimeline();
   loadContacts();
 });
 
@@ -53,7 +54,7 @@ function bindNav() {
       if (view === 'all') renderAll();
       if (view === 'completed') renderCompleted();
       if (view === 'calendar') showCalendarView();
-      if (view === 'inbox') { showInboxPrompt(); loadInboxCalendar(); }
+      if (view === 'inbox') { showInboxPrompt(); renderInboxTimeline(); }
       if (view === 'scheduled') renderScheduled();
       if (view === 'weekly') renderWeekly();
       if (view === 'conversations') renderConversations();
@@ -234,6 +235,7 @@ function toggleSection(id) {
 }
 
 function renderToday() {
+  renderInboxTimeline();
   const el = document.getElementById('today-tasks');
   const sorted = sortTasks([...tasks]);
   const thisWeekBounds = getWeekBounds(0);
@@ -377,6 +379,39 @@ function schedulePreview() {
   previewTimer = setTimeout(updatePreview, 200);
 }
 
+// ── Inbox quick-add bar — same parser, same preview format, one keystroke ──
+function updateQuickAddPreview() {
+  const el = document.getElementById('quickadd-preview');
+  const input = document.getElementById('quickadd-input');
+  if (!el || !input) return;
+  const text = input.value;
+  if (!text.trim()) { el.innerHTML = ''; return; }
+  const preview = formatPreview(parseTask(text)).replace(/#(\S+)/, '<span class="qa-tag">#$1</span>');
+  el.innerHTML = '<span class="qa-dot"></span><span>' + preview + '</span>';
+}
+
+let quickAddPreviewTimer = null;
+function scheduleQuickAddPreview() {
+  clearTimeout(quickAddPreviewTimer);
+  quickAddPreviewTimer = setTimeout(updateQuickAddPreview, 200);
+}
+
+async function submitQuickAdd() {
+  const input = document.getElementById('quickadd-input');
+  const rawText = input.value.trim();
+  if (!rawText) return;
+  await createTask({ raw_text: rawText, category: 'work', recurring: '' });
+  input.value = '';
+  document.getElementById('quickadd-preview').innerHTML = '';
+}
+
+function bindQuickAdd() {
+  const input = document.getElementById('quickadd-input');
+  if (!input) return;
+  input.addEventListener('input', scheduleQuickAddPreview);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submitQuickAdd(); });
+}
+
 function bindModal() {
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   (() => {
@@ -404,7 +439,13 @@ function bindModal() {
     const tag = document.activeElement.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable) return;
     const key = e.key.toLowerCase();
-    if (key === 'n') { e.preventDefault(); openModal(); return; }
+    if (key === 'n') {
+      e.preventDefault();
+      const quickAdd = document.getElementById('quickadd-input');
+      const onInbox = quickAdd && !document.getElementById('view-inbox').classList.contains('hidden');
+      if (onInbox) quickAdd.focus(); else openModal();
+      return;
+    }
     if (NAV_SHORTCUTS[key]) {
       const nav = document.querySelector('.ni[data-view="' + NAV_SHORTCUTS[key] + '"]');
       if (nav) { e.preventDefault(); nav.click(); }
@@ -673,7 +714,7 @@ function showInboxPrompt() {
   const el = document.getElementById('inbox-proposals');
   if (!el) return;
   if (el._loaded) return;
-  el.innerHTML = '<div class="empty-state"><i class="ti ti-mail"></i><div class="empty-state-text">Check your inbox for emails needing action</div><button onclick="loadInbox()" class="btn-add">Check emails</button></div>';
+  el.innerHTML = '<div class="inbox-check-card"><div class="inbox-check-icon"><i class="ti ti-mail"></i></div><div><div style="font-size:12.5px;font-weight:600;">Check your inbox</div><button class="inbox-check-link" onclick="loadInbox()">Check emails →</button></div></div>';
 }
 
 async function loadInbox(reset = false) {
@@ -1109,43 +1150,95 @@ async function generateDay() {
   renderToday();
 }
 
-// ── Inbox calendar strip ──────────────────────────────────────────────────────
-async function loadInboxCalendar() {
-  const el = document.getElementById('inbox-calendar-strip');
-  if (!el) return;
-  try {
-    const res = await fetch('/api/calendar');
-    const data = await res.json();
-    const events = data.events || [];
-    const days = [];
-    for (let i = 0; i < 3; i++) {
-      const d = new Date();
-      d.setDate(d.getDate() + i);
-      days.push(d);
-    }
-    let html = '<div class="inbox-cal-strip">';
-    days.forEach(d => {
-      const ds = localDateStr(d);
-      const isToday = ds === today;
-      const label = isToday ? 'Today' : d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
-      const dayEvents = events.filter(e => e.start.split('T')[0] === ds);
-      html += '<div class="inbox-cal-day' + (isToday ? ' today' : '') + '">';
-      html += '<div class="inbox-cal-day-label">' + label + '</div>';
-      if (dayEvents.length) {
-        dayEvents.forEach(e => {
-          const time = e.allDay ? '' : ' ' + new Date(e.start).toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
-          html += '<div class="inbox-cal-event">' + e.title + time + '</div>';
-        });
+// ── Inbox: your day as one merged timeline ────────────────────────────────────
+// Tasks and calendar events are interleaved chronologically instead of living
+// in separate boxes you have to cross-reference — this is the thing that
+// actually changed about the Inbox, not just its colours.
+async function renderInboxTimeline() {
+  const timelineEl = document.getElementById('inbox-timeline-body');
+  if (!timelineEl) return; // not on the inbox view
+  const anytimeEl = document.getElementById('inbox-anytime-body');
+  const comingupEl = document.getElementById('inbox-comingup-body');
+
+  let events = [];
+  try { events = await loadCalendarEvents(); } catch (e) { events = []; }
+
+  const todayEvents = events.filter(e => e.start.split('T')[0] === today);
+  const timedEvents = todayEvents.filter(e => !e.allDay);
+  const allDayEvents = todayEvents.filter(e => e.allDay);
+
+  const todaysTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === today);
+  const timedTasks = todaysTasks.filter(t => t.time_block);
+  const untimedToday = todaysTasks.filter(t => !t.time_block);
+  const undated = tasks.filter(t => !t.due_date);
+  const overdue = tasks.filter(t => t.due_date && t.due_date.split('T')[0] < today);
+
+  // ── timeline: events + timed tasks, sorted by time ──
+  const entries = [
+    ...timedEvents.map(e => ({ time: new Date(e.start).toTimeString().slice(0, 5), kind: 'event', title: e.title })),
+    ...timedTasks.map(t => ({ time: t.time_block, kind: 'task', task: t }))
+  ].sort((a, b) => a.time.localeCompare(b.time));
+
+  const now = new Date();
+  const nowStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  const nowRow = '<div class="tl-row"><div class="tl-now-time">NOW</div><div class="tl-rail"><div class="tl-now-dot"></div></div><div class="tl-now-line"></div></div>';
+
+  let placed = false;
+  let html = '';
+  if (!entries.length) {
+    html = nowRow;
+  } else {
+    entries.forEach((entry, i) => {
+      if (!placed && entry.time > nowStr) { html += nowRow; placed = true; }
+      const isLast = i === entries.length - 1;
+      if (entry.kind === 'event') {
+        html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><div class="tl-dot"></div>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-event-title">' + entry.title + '</div></div></div>';
       } else {
-        html += '<div class="inbox-cal-empty">Clear</div>';
+        const t = entry.task;
+        const checkClass = t.priority === 'p1' ? ' p1' : t.priority === 'p2' ? ' p2' : '';
+        html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><button aria-label="Mark complete" class="tl-check' + checkClass + '" onclick="completeTask(' + t.id + ')"></button>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-card"><div class="tl-task-title">' + t.title + '</div>' + (t.tag ? '<span class="tl-tag">#' + t.tag + '</span>' : '') + '</div></div></div>';
       }
-      html += '</div>';
     });
-    html += '</div>';
-    el.innerHTML = html;
-  } catch(e) {
-    console.log('Calendar strip unavailable');
+    if (!placed) html += nowRow;
   }
+  timelineEl.innerHTML = html;
+
+  // ── anytime rail ──
+  let anytimeHtml = '';
+  if (overdue.length) {
+    anytimeHtml += '<div class="overdue-label">OVERDUE</div>';
+    overdue.forEach(t => {
+      anytimeHtml += '<div class="anytime-row"><button aria-label="Mark complete" class="anytime-check" style="border-color:var(--p1);" onclick="completeTask(' + t.id + ')"></button><div class="anytime-title" style="color:var(--p1);">' + t.title + '</div></div>';
+    });
+  }
+  anytimeHtml += '<div class="inbox-col-label"' + (overdue.length ? ' style="margin-top:20px;"' : '') + '>ANYTIME</div>';
+  const anytimeTasks = [...untimedToday, ...undated];
+  if (anytimeTasks.length) {
+    anytimeTasks.forEach(t => {
+      anytimeHtml += '<div class="anytime-row"><button aria-label="Mark complete" class="anytime-check" onclick="completeTask(' + t.id + ')"></button><div><div class="anytime-title">' + t.title + '</div>' + (t.tag ? '<span class="tl-tag" style="margin-top:5px;display:inline-block;">#' + t.tag + '</span>' : '') + '</div></div>';
+    });
+  } else {
+    anytimeHtml += '<div style="font-size:12.5px;color:var(--text3);padding:6px 4px;">Nothing loose today.</div>';
+  }
+  if (allDayEvents.length) {
+    allDayEvents.forEach(e => {
+      anytimeHtml += '<div class="anytime-row"><span style="width:16px;flex-shrink:0;text-align:center;color:var(--sage);">•</span><div class="anytime-title">' + e.title + '</div></div>';
+    });
+  }
+  if (anytimeEl) anytimeEl.innerHTML = anytimeHtml;
+
+  // ── coming up: next 2 days, condensed ──
+  let comingupHtml = '<div class="inbox-col-label" style="margin-top:20px;">COMING UP</div>';
+  for (let i = 1; i <= 2; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const ds = localDateStr(d);
+    const label = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
+    const dayEvents = events.filter(e => e.start.split('T')[0] === ds);
+    const summary = dayEvents.length ? dayEvents.map(e => e.title).join(', ') : 'Clear';
+    comingupHtml += '<div class="comingup-row"><span class="comingup-day">' + label + '</span><span class="comingup-summary">' + summary + '</span></div>';
+  }
+  if (comingupEl) comingupEl.innerHTML = comingupHtml;
 }
 
 // ── Conversations ─────────────────────────────────────────────────────────────
@@ -1229,7 +1322,7 @@ function mobileNav(view, tabEl) {
   if (view === 'all') renderAll();
   if (view === 'completed') renderCompleted();
   if (view === 'calendar') showCalendarView();
-  if (view === 'inbox') { showInboxPrompt(); loadInboxCalendar(); }
+  if (view === 'inbox') { showInboxPrompt(); renderInboxTimeline(); }
   if (view === 'scheduled') renderScheduled();
   if (view === 'weekly') renderWeekly();
   if (view === 'conversations') renderConversations();

@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Daily HQ</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="style.css">
   <link rel="icon" type="image/png" href="FAVICON.png">
 </head>
@@ -54,8 +57,26 @@
 
       <!-- Inbox view -->
       <div class="view" id="view-inbox">
-        <div id="inbox-calendar-strip"></div>
-        <div id="inbox-proposals"></div>
+        <div class="quickadd-wrap">
+          <div class="quickadd-bar">
+            <i class="ti ti-plus"></i>
+            <input type="text" id="quickadd-input" placeholder="e.g. Invoice Lidl IE #admin Friday 3pm !!" autocomplete="off" />
+            <span class="quickadd-kbd">N</span>
+          </div>
+          <div class="quickadd-preview" id="quickadd-preview"></div>
+        </div>
+
+        <div class="inbox-columns">
+          <div class="inbox-timeline">
+            <div class="inbox-col-label">YOUR DAY</div>
+            <div id="inbox-timeline-body"></div>
+          </div>
+          <div class="inbox-anytime">
+            <div id="inbox-anytime-body"></div>
+            <div id="inbox-comingup-body"></div>
+            <div id="inbox-proposals"></div>
+          </div>
+        </div>
 
       </div>
 

@@ -141,17 +141,19 @@ app.get('/login', (req, res) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Daily HQ — Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #14100e; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #14100e; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     .card { background: #1c1815; border: 0.5px solid #2e2823; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; }
-    .logo { font-size: 20px; font-weight: 600; color: #2DD4BF; margin-bottom: 4px; }
+    .logo { font-size: 20px; font-weight: 600; color: #DD5E3C; margin-bottom: 4px; }
     .sub { font-size: 12px; color: #7a736c; margin-bottom: 2rem; }
     label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #7a736c; display: block; margin-bottom: 6px; }
     input { width: 100%; padding: 10px 12px; background: #14100e; border: 0.5px solid #2e2823; border-radius: 8px; color: #e0e0e0; font-size: 14px; outline: none; margin-bottom: 1rem; transition: border-color 0.15s, box-shadow 0.15s; }
-    input:focus { border-color: #2DD4BF; box-shadow: 0 0 0 3px rgba(45,212,191,0.14); }
-    button { width: 100%; padding: 11px; background: #2DD4BF; color: #0A2E29; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
-    button:hover { background: #5EE6D3; }
+    input:focus { border-color: #DD5E3C; box-shadow: 0 0 0 3px rgba(221,94,60,0.14); }
+    button { width: 100%; padding: 11px; background: #DD5E3C; color: #1A0904; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+    button:hover { background: #E97952; }
     .error { font-size: 13px; color: #ff8a8a; margin-bottom: 1rem; background: #2e1414; padding: 8px 12px; border-radius: 6px; }
   </style>
 </head>
@@ -204,20 +206,22 @@ app.get('/login/2fa', (req, res) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Daily HQ — 2FA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #14100e; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #14100e; color: #e0e0e0; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
     .card { background: #1c1815; border: 0.5px solid #2e2823; border-radius: 12px; padding: 2rem; width: 100%; max-width: 360px; }
-    .logo { font-size: 20px; font-weight: 600; color: #2DD4BF; margin-bottom: 4px; }
+    .logo { font-size: 20px; font-weight: 600; color: #DD5E3C; margin-bottom: 4px; }
     .sub { font-size: 13px; color: #928a82; margin-bottom: 2rem; line-height: 1.5; }
     label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #7a736c; display: block; margin-bottom: 6px; }
     input { width: 100%; padding: 10px 12px; background: #14100e; border: 0.5px solid #2e2823; border-radius: 8px; color: #e0e0e0; font-size: 20px; letter-spacing: .2em; outline: none; margin-bottom: 1rem; text-align: center; transition: border-color 0.15s, box-shadow 0.15s; }
-    input:focus { border-color: #2DD4BF; box-shadow: 0 0 0 3px rgba(45,212,191,0.14); }
-    button { width: 100%; padding: 11px; background: #2DD4BF; color: #0A2E29; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
-    button:hover { background: #5EE6D3; }
+    input:focus { border-color: #DD5E3C; box-shadow: 0 0 0 3px rgba(221,94,60,0.14); }
+    button { width: 100%; padding: 11px; background: #DD5E3C; color: #1A0904; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; transition: background 0.15s; }
+    button:hover { background: #E97952; }
     .error { font-size: 13px; color: #ff8a8a; margin-bottom: 1rem; background: #2e1414; padding: 8px 12px; border-radius: 6px; }
     .back { text-align: center; margin-top: 1rem; font-size: 12px; color: #7a736c; }
-    .back a { color: #2DD4BF; }
+    .back a { color: #DD5E3C; }
   </style>
 </head>
 <body>
