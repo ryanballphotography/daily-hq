@@ -259,6 +259,11 @@
           <label>Task</label>
           <input type="text" id="m-title" placeholder="e.g. Invoice Lidl IE #admin Friday 3pm !!" autocomplete="off" />
           <div id="m-preview" style="font-size:12px;color:var(--text3);margin-top:6px;min-height:1.4em;"></div>
+          <button type="button" id="m-pick-toggle" style="font-size:12px;background:none;border:none;color:var(--text3);cursor:pointer;padding:0;margin-top:2px;text-decoration:underline;">Set date/time manually</button>
+          <div id="m-pick-fields" style="display:none;gap:8px;margin-top:6px;">
+            <input type="date" id="m-pick-date" style="flex:1;" />
+            <input type="time" id="m-pick-time" style="flex:1;" />
+          </div>
         </div>
         <div class="modal-field">
           <label>Notes</label>

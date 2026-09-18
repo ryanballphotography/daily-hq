@@ -147,6 +147,7 @@ async function editTask(id) {
   document.getElementById('m-notes').value = t.notes || '';
   document.getElementById('m-category').value = t.category || 'work';
   document.getElementById('m-recurring').value = t.recurring || '';
+  resetPickerFields(t.due_date ? t.due_date.split('T')[0] : '', t.time_block || '');
   document.getElementById('modal-bg').classList.remove('hidden');
   document.getElementById('modal-bg')._editId = id;
   updatePreview();
@@ -334,6 +335,7 @@ async function editCompletedTask(id) {
   document.getElementById('m-recurring').value = t.recurring || '';
   const doneEl = document.getElementById('m-done');
   if (doneEl) doneEl.checked = t.done || false;
+  resetPickerFields(t.due_date ? t.due_date.split('T')[0] : '', t.time_block || '');
   document.getElementById('modal-bg').classList.remove('hidden');
   document.getElementById('modal-bg')._editId = id;
   document.getElementById('modal-bg')._wasCompleted = t.done || false;
@@ -386,16 +388,55 @@ function bindModal() {
   document.getElementById('modal-save').addEventListener('click', saveModal);
   document.getElementById('m-title').addEventListener('keydown', e => { if (e.key === 'Enter') saveModal(); });
   document.getElementById('m-title').addEventListener('input', schedulePreview);
+  document.getElementById('m-pick-toggle').addEventListener('click', () => {
+    const el = document.getElementById('m-pick-fields');
+    el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
+  });
+  document.getElementById('m-pick-date').addEventListener('change', applyPickedDate);
+  document.getElementById('m-pick-time').addEventListener('change', applyPickedDate);
 
-  // "n" opens the new-task modal, as long as you're not typing somewhere else.
+  // Single-key shortcuts, as long as you're not typing somewhere else or the
+  // modal is already open: n = new task, t/w/s/c/m = jump to a nav tab.
+  const NAV_SHORTCUTS = { t: 'today', w: 'weekly', s: 'scheduled', c: 'calendar', m: 'marketing' };
   document.addEventListener('keydown', e => {
-    if (e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (!document.getElementById('modal-bg').classList.contains('hidden')) return;
     const tag = document.activeElement.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable) return;
-    e.preventDefault();
-    openModal();
+    const key = e.key.toLowerCase();
+    if (key === 'n') { e.preventDefault(); openModal(); return; }
+    if (NAV_SHORTCUTS[key]) {
+      const nav = document.querySelector('.ni[data-view="' + NAV_SHORTCUTS[key] + '"]');
+      if (nav) { e.preventDefault(); nav.click(); }
+    }
   });
+}
+
+// The sentence stays the source of truth even when using the manual picker:
+// picking a date/time writes it into the sentence as plain text (replacing
+// whatever this same picker last inserted) rather than as a hidden field
+// that could disagree with what the parser derives from the text.
+let pickerInsertion = null;
+function applyPickedDate() {
+  const dateVal = document.getElementById('m-pick-date').value;
+  const timeVal = document.getElementById('m-pick-time').value;
+  const titleEl = document.getElementById('m-title');
+  if (pickerInsertion) {
+    titleEl.value = titleEl.value.replace(pickerInsertion, '').trim();
+    pickerInsertion = null;
+  }
+  if (dateVal) {
+    pickerInsertion = dateVal + (timeVal ? ' ' + timeVal : '');
+    titleEl.value = (titleEl.value ? titleEl.value + ' ' : '') + pickerInsertion;
+  }
+  updatePreview();
+}
+
+function resetPickerFields(dateVal, timeVal) {
+  document.getElementById('m-pick-date').value = dateVal || '';
+  document.getElementById('m-pick-time').value = timeVal || '';
+  document.getElementById('m-pick-fields').style.display = 'none';
+  pickerInsertion = null;
 }
 
 function openModal() {
@@ -404,6 +445,7 @@ function openModal() {
   document.getElementById('m-category').value = 'work';
   document.getElementById('m-recurring').value = '';
   document.getElementById('m-preview').textContent = '';
+  resetPickerFields();
   document.getElementById("modal-bg").classList.remove('hidden');
   setTimeout(() => document.getElementById('m-title').focus(), 50);
 }
@@ -682,6 +724,7 @@ function acceptProposal(i) {
   document.getElementById('m-notes').value = p.action + ' (from: ' + p.from + ')';
   document.getElementById('m-category').value = 'work';
   document.getElementById('m-recurring').value = '';
+  resetPickerFields();
   document.getElementById('modal-bg').classList.remove('hidden');
   document.getElementById('modal-bg')._proposalIndex = i;
   updatePreview();
