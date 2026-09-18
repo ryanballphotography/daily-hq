@@ -441,7 +441,7 @@ function bindModal() {
 
   // Single-key shortcuts, as long as you're not typing somewhere else or the
   // modal is already open: n = new task, t/w/s/c/m = jump to a nav tab.
-  const NAV_SHORTCUTS = { t: 'today', w: 'weekly', s: 'scheduled', c: 'calendar', m: 'marketing' };
+  const NAV_SHORTCUTS = { i: 'inbox', t: 'today', w: 'weekly', s: 'scheduled', c: 'calendar', m: 'marketing' };
   document.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (!document.getElementById('modal-bg').classList.contains('hidden')) return;
@@ -1218,7 +1218,7 @@ async function renderInboxTimeline() {
       } else {
         const t = entry.task;
         const checkClass = t.priority === 'p1' ? ' p1' : t.priority === 'p2' ? ' p2' : '';
-        html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><button aria-label="Mark complete" class="tl-check' + checkClass + '" onclick="completeTask(' + t.id + ')"></button>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-card"><div class="tl-task-title">' + t.title + '</div>' + (t.tag ? '<span class="tl-tag">#' + t.tag + '</span>' : '') + '</div></div></div>';
+        html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><button aria-label="Mark complete" class="tl-check' + checkClass + '" onclick="completeTask(' + t.id + ')"></button>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-card" ondblclick="editTask(' + t.id + ')"><div class="tl-task-title">' + t.title + '</div>' + (t.tag ? '<span class="tl-tag">#' + t.tag + '</span>' : '') + '<i class="ti ti-pencil task-del" onclick="editTask(' + t.id + ')" style="position:absolute;top:8px;right:10px;"></i></div></div></div>';
       }
     });
     if (!placed) html += nowRow;

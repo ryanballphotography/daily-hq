@@ -317,8 +317,9 @@ body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Seg
 .tl-line { width: 1.5px; flex-grow: 1; background: var(--border2); margin-top: 4px; min-height: 8px; }
 .tl-body { flex-grow: 1; padding-bottom: 16px; min-width: 0; }
 .tl-event-title { font-size: 13.5px; font-weight: 600; color: var(--text2); }
-.tl-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 11px; padding: 11px 15px; box-shadow: 0 1px 3px var(--shadow); }
-.tl-card .tl-task-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.tl-card { position: relative; background: var(--bg2); border: 1px solid var(--border); border-radius: 11px; padding: 11px 15px; box-shadow: 0 1px 3px var(--shadow); cursor: pointer; }
+.tl-card .tl-task-title { font-size: 14px; font-weight: 600; color: var(--text); padding-right: 20px; }
+.tl-card:hover .task-del { opacity: 1; }
 .tl-check { width: 14px; height: 14px; margin-top: 9px; border-radius: 50%; border: 1.6px solid var(--accent); background: var(--bg); flex-shrink: 0; cursor: pointer; padding: 0; }
 .tl-check.p1 { border-color: var(--p1); }
 .tl-check.p2 { border-color: var(--p2); }
