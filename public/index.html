@@ -215,6 +215,12 @@
     </div>
   </div>
 
+  <!-- Floating add-task button (mobile only — the topbar button is out of
+       thumb reach once you've scrolled, this stays fixed on screen) -->
+  <button class="task-fab mobile-only" id="task-fab" onclick="openModal()" title="Add task">
+    <i class="ti ti-plus"></i>
+  </button>
+
   <!-- Floating chat button -->
   <button class="chat-fab" id="chat-fab" onclick="toggleChat()" title="PA Chat">
     <i class="ti ti-message-circle"></i>

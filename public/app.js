@@ -386,6 +386,16 @@ function bindModal() {
   document.getElementById('modal-save').addEventListener('click', saveModal);
   document.getElementById('m-title').addEventListener('keydown', e => { if (e.key === 'Enter') saveModal(); });
   document.getElementById('m-title').addEventListener('input', schedulePreview);
+
+  // "n" opens the new-task modal, as long as you're not typing somewhere else.
+  document.addEventListener('keydown', e => {
+    if (e.key.toLowerCase() !== 'n' || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (!document.getElementById('modal-bg').classList.contains('hidden')) return;
+    const tag = document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement.isContentEditable) return;
+    e.preventDefault();
+    openModal();
+  });
 }
 
 function openModal() {
