@@ -41,7 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
   bindChat();
   bindQuickAdd();
   showInboxPrompt();
-  renderInboxTimeline();
   loadContacts();
 });
 
@@ -63,7 +62,8 @@ function bindNav() {
       if (view === 'all') renderAll();
       if (view === 'completed') renderCompleted();
       if (view === 'calendar') showCalendarView();
-      if (view === 'inbox') { showInboxPrompt(); renderInboxTimeline(); }
+      if (view === 'inbox') showInboxPrompt();
+      if (view === 'timeline') renderTimelineFeed();
       if (view === 'scheduled') renderScheduled();
       if (view === 'weekly') renderWeekly();
       if (view === 'conversations') renderConversations();
@@ -244,7 +244,7 @@ function toggleSection(id) {
 }
 
 function renderToday() {
-  renderInboxTimeline();
+  renderTimelineFeed();
   const el = document.getElementById('today-tasks');
   const sorted = sortTasks([...tasks]);
   const thisWeekBounds = getWeekBounds(0);
@@ -1166,36 +1166,25 @@ async function generateDay() {
   renderToday();
 }
 
-// ── Inbox: your day as one merged timeline ────────────────────────────────────
-// Tasks and calendar events are interleaved chronologically instead of living
-// in separate boxes you have to cross-reference — this is the thing that
-// actually changed about the Inbox, not just its colours.
-async function renderInboxTimeline() {
-  const timelineEl = document.getElementById('inbox-timeline-body');
-  if (!timelineEl) return; // not on the inbox view
-  const anytimeEl = document.getElementById('inbox-anytime-body');
-  const comingupEl = document.getElementById('inbox-comingup-body');
+// ── Timeline: tasks and calendar events merged into one day-grouped feed ──────
+// Google Calendar's own "Schedule" list view is the model — overdue first,
+// then every day from today onward that actually has something in it (bounded
+// by whatever the calendar feed returns, same as Google's own list), then
+// undated tasks at the bottom. This used to live inside the Inbox as "your
+// day", but Inbox is capture-only now — this is its own view so it can grow
+// forward instead of being stuck showing just today.
+function timelineRowsHTML(dayTasks, dayEvents, isToday) {
+  const timedEvents = dayEvents.filter(e => !e.allDay);
+  const allDayEvents = dayEvents.filter(e => e.allDay);
+  const timedTasks = dayTasks.filter(t => t.time_block);
+  const untimedTasks = dayTasks.filter(t => !t.time_block);
 
-  let events = [];
-  try { events = await loadCalendarEvents(); } catch (e) { events = []; }
-
-  const todayEvents = events.filter(e => e.start.split('T')[0] === today);
-  const timedEvents = todayEvents.filter(e => !e.allDay);
-  const allDayEvents = todayEvents.filter(e => e.allDay);
-
-  const todaysTasks = tasks.filter(t => t.due_date && t.due_date.split('T')[0] === today);
-  const timedTasks = todaysTasks.filter(t => t.time_block);
-  const untimedToday = todaysTasks.filter(t => !t.time_block);
-  const undated = tasks.filter(t => !t.due_date);
-  const overdue = tasks.filter(t => t.due_date && t.due_date.split('T')[0] < today);
-
-  // ── timeline: events + timed tasks, sorted by time. Untimed items (today's
-  // tasks and all-day events with no fixed time) lead the list with a blank
-  // time slot instead of living in a separate "Anytime" panel — they used to
-  // look identical to tasks with no date at all, which read as a bug even
-  // though both were correctly categorised. ──
+  // Untimed items (tasks and all-day events with no fixed time) lead the
+  // list with a blank time slot instead of living in a separate "Anytime"
+  // panel — they used to look identical to tasks with no date at all, which
+  // read as a bug even though both were correctly categorised.
   const entries = [
-    ...untimedToday.map(t => ({ time: '', kind: 'task', task: t })),
+    ...untimedTasks.map(t => ({ time: '', kind: 'task', task: t })),
     ...allDayEvents.map(e => ({ time: '', kind: 'event', title: e.title })),
     ...timedEvents.map(e => ({ time: new Date(e.start).toTimeString().slice(0, 5), kind: 'event', title: e.title })),
     ...timedTasks.map(t => ({ time: t.time_block, kind: 'task', task: t }))
@@ -1207,54 +1196,59 @@ async function renderInboxTimeline() {
 
   let placed = false;
   let html = '';
-  if (!entries.length) {
-    html = nowRow;
-  } else {
-    entries.forEach((entry, i) => {
-      if (!placed && entry.time > nowStr) { html += nowRow; placed = true; }
-      const isLast = i === entries.length - 1;
-      if (entry.kind === 'event') {
-        html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><div class="tl-dot"></div>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-event-title">' + entry.title + '</div></div></div>';
-      } else {
-        const t = entry.task;
-        const checkClass = t.priority === 'p1' ? ' p1' : t.priority === 'p2' ? ' p2' : '';
-        html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><button aria-label="Mark complete" class="tl-check' + checkClass + '" onclick="completeTask(' + t.id + ')"></button>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-card" ondblclick="editTask(' + t.id + ')"><div class="tl-task-title">' + t.title + '</div>' + (t.tag ? '<span class="tl-tag">#' + t.tag + '</span>' : '') + '<i class="ti ti-pencil task-del" onclick="editTask(' + t.id + ')" style="position:absolute;top:8px;right:10px;"></i></div></div></div>';
-      }
-    });
-    if (!placed) html += nowRow;
-  }
-  timelineEl.innerHTML = html;
+  entries.forEach((entry, i) => {
+    if (isToday && !placed && entry.time > nowStr) { html += nowRow; placed = true; }
+    const isLast = i === entries.length - 1;
+    if (entry.kind === 'event') {
+      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><div class="tl-dot"></div>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-event-title">' + entry.title + '</div></div></div>';
+    } else {
+      const t = entry.task;
+      const checkClass = t.priority === 'p1' ? ' p1' : t.priority === 'p2' ? ' p2' : '';
+      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><button aria-label="Mark complete" class="tl-check' + checkClass + '" onclick="completeTask(' + t.id + ')"></button>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-card" ondblclick="editTask(' + t.id + ')"><div class="tl-task-title">' + t.title + '</div>' + (t.tag ? '<span class="tl-tag">#' + t.tag + '</span>' : '') + '<i class="ti ti-pencil task-del" onclick="editTask(' + t.id + ')" style="position:absolute;top:8px;right:10px;"></i></div></div></div>';
+    }
+  });
+  if (isToday && !placed) html += nowRow;
+  return html;
+}
 
-  // ── anytime rail ──
-  let anytimeHtml = '';
+async function renderTimelineFeed() {
+  const el = document.getElementById('timeline-feed-body');
+  if (!el) return;
+
+  let events = [];
+  try { events = await loadCalendarEvents(); } catch (e) { events = []; }
+
+  const overdue = tasks.filter(t => t.due_date && t.due_date.split('T')[0] < today);
+  const undated = tasks.filter(t => !t.due_date);
+
+  const days = {};
+  const bucket = ds => (days[ds] = days[ds] || { tasks: [], events: [] });
+  tasks.forEach(t => {
+    if (!t.due_date) return;
+    const ds = t.due_date.split('T')[0];
+    if (ds < today) return;
+    bucket(ds).tasks.push(t);
+  });
+  events.forEach(e => bucket(e.start.split('T')[0]).events.push(e));
+
+  let html = '';
   if (overdue.length) {
-    anytimeHtml += '<div class="overdue-label">OVERDUE</div>';
-    overdue.forEach(t => {
-      anytimeHtml += '<div class="anytime-row"><button aria-label="Mark complete" class="anytime-check" style="border-color:var(--p1);" onclick="completeTask(' + t.id + ')"></button><div class="anytime-title" style="color:var(--p1);">' + t.title + '</div></div>';
-    });
+    html += '<div class="sched-day-label overdue">Overdue</div>';
+    html += overdue.map(taskHTML).join('');
   }
-  // Untimed today-tasks and all-day events now live in the timeline itself
-  // (above), not here — this column only holds overdue and undated tasks.
-  if (undated.length) {
-    anytimeHtml += '<div class="inbox-col-label"' + (overdue.length ? ' style="margin-top:20px;"' : '') + '>NO DATE</div>';
-    undated.forEach(t => {
-      anytimeHtml += '<div class="anytime-row"><button aria-label="Mark complete" class="anytime-check" onclick="completeTask(' + t.id + ')"></button><div><div class="anytime-title">' + t.title + '</div>' + (t.tag ? '<span class="tl-tag" style="margin-top:5px;display:inline-block;">#' + t.tag + '</span>' : '') + '</div></div>';
-    });
-  }
-  if (anytimeEl) anytimeEl.innerHTML = anytimeHtml;
 
-  // ── coming up: next 2 days, condensed ──
-  let comingupHtml = '<div class="inbox-col-label" style="margin-top:20px;">COMING UP</div>';
-  for (let i = 1; i <= 2; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    const ds = localDateStr(d);
-    const label = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' });
-    const dayEvents = events.filter(e => e.start.split('T')[0] === ds);
-    const summary = dayEvents.length ? dayEvents.map(e => e.title).join(', ') : 'Clear';
-    comingupHtml += '<div class="comingup-row"><span class="comingup-day">' + label + '</span><span class="comingup-summary">' + summary + '</span></div>';
+  Object.keys(days).sort().forEach(ds => {
+    const d = new Date(ds + 'T00:00:00');
+    html += '<div class="sched-day-label">' + formatDayLabel(d) + '</div>';
+    html += timelineRowsHTML(days[ds].tasks, days[ds].events, ds === today);
+  });
+
+  if (undated.length) {
+    html += '<div class="sched-day-label" style="margin-top:1.5rem;">No date</div>';
+    html += undated.map(taskHTML).join('');
   }
-  if (comingupEl) comingupEl.innerHTML = comingupHtml;
+
+  el.innerHTML = html || '<div class="empty">Nothing scheduled.</div>';
 }
 
 // ── Conversations ─────────────────────────────────────────────────────────────
@@ -1327,6 +1321,7 @@ function mobileNav(view, tabEl) {
     view === 'scheduled' ? 'Scheduled' :
     view === 'completed' ? 'Completed' :
     view === 'calendar' ? 'Calendar' :
+    view === 'timeline' ? 'Timeline' :
     view === 'conversations' ? 'Conversations' : view;
   document.querySelectorAll('.mobile-tab').forEach(t => t.classList.remove('active'));
   if (tabEl) tabEl.classList.add('active');
@@ -1338,7 +1333,8 @@ function mobileNav(view, tabEl) {
   if (view === 'all') renderAll();
   if (view === 'completed') renderCompleted();
   if (view === 'calendar') showCalendarView();
-  if (view === 'inbox') { showInboxPrompt(); renderInboxTimeline(); }
+  if (view === 'inbox') showInboxPrompt();
+  if (view === 'timeline') renderTimelineFeed();
   if (view === 'scheduled') renderScheduled();
   if (view === 'weekly') renderWeekly();
   if (view === 'conversations') renderConversations();
@@ -1400,7 +1396,8 @@ async function refreshCurrentView() {
   if (view === 'all') renderAll();
   if (view === 'completed') renderCompleted();
   if (view === 'calendar') showCalendarView();
-  if (view === 'inbox') { showInboxPrompt(); renderInboxTimeline(); }
+  if (view === 'inbox') showInboxPrompt();
+  if (view === 'timeline') renderTimelineFeed();
   if (view === 'scheduled') renderScheduled();
   if (view === 'weekly') renderWeekly();
   if (view === 'marketing') {

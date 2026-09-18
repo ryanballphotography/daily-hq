@@ -25,6 +25,7 @@
       <div class="ni" data-view="today"><i class="ti ti-layout-dashboard"></i> Today</div>
       <div class="ni" data-view="weekly"><i class="ti ti-layout-columns"></i> Weekly</div>
       <div class="ni" data-view="scheduled"><i class="ti ti-list-details"></i> Scheduled</div>
+      <div class="ni" data-view="timeline"><i class="ti ti-timeline"></i> Timeline</div>
       <div class="ni" data-view="calendar"><i class="ti ti-calendar"></i> Calendar</div>
       <div class="ni" data-view="marketing"><i class="ti ti-speakerphone"></i> Marketing</div>
 
@@ -55,7 +56,8 @@
         <button class="btn-add" id="btn-add-task"><i class="ti ti-plus"></i> Add task</button>
       </div>
 
-      <!-- Inbox view -->
+      <!-- Inbox view — capture only. Anything that isn't "add a task" or
+           "turn an email into a task" lives in Timeline/Today/Scheduled now. -->
       <div class="view" id="view-inbox">
         <div class="quickadd-wrap">
           <div class="quickadd-bar">
@@ -66,18 +68,13 @@
           <div class="quickadd-preview" id="quickadd-preview"></div>
         </div>
 
-        <div class="inbox-columns">
-          <div class="inbox-timeline">
-            <div class="inbox-col-label">YOUR DAY</div>
-            <div id="inbox-timeline-body"></div>
-          </div>
-          <div class="inbox-anytime">
-            <div id="inbox-anytime-body"></div>
-            <div id="inbox-comingup-body"></div>
-            <div id="inbox-proposals"></div>
-          </div>
-        </div>
+        <div id="inbox-proposals" style="margin-top:1.5rem;"></div>
+      </div>
 
+      <!-- Timeline view — tasks and calendar events merged into one
+           day-grouped, scrollable feed, Google Calendar "Schedule"-style. -->
+      <div class="view hidden" id="view-timeline">
+        <div id="timeline-feed-body"></div>
       </div>
 
       <!-- Today view -->
@@ -344,6 +341,7 @@
   <!-- Mobile more sheet -->
   <div class="mobile-more-sheet" id="mobile-more-sheet">
     <div class="mobile-more-item" onclick="mobileNav('scheduled',null);toggleMoreSheet()"><i class="ti ti-list-details"></i> Scheduled</div>
+    <div class="mobile-more-item" onclick="mobileNav('timeline',null);toggleMoreSheet()"><i class="ti ti-timeline"></i> Timeline</div>
     <div class="mobile-more-item" onclick="mobileNav('completed',null);toggleMoreSheet()"><i class="ti ti-circle-check"></i> Completed</div>
     <div class="mobile-more-item" onclick="mobileNav('calendar',null);toggleMoreSheet()"><i class="ti ti-calendar"></i> Calendar</div>
     <div class="mobile-more-item" onclick="mobileNav('marketing',null);toggleMoreSheet()"><i class="ti ti-speakerphone"></i> Marketing</div>
