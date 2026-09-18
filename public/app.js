@@ -1227,18 +1227,26 @@ async function renderInboxTimeline() {
       anytimeHtml += '<div class="anytime-row"><button aria-label="Mark complete" class="anytime-check" style="border-color:var(--p1);" onclick="completeTask(' + t.id + ')"></button><div class="anytime-title" style="color:var(--p1);">' + t.title + '</div></div>';
     });
   }
+  // "Anytime" = dated for today but with no fixed time (tasks and all-day
+  // events alike). Kept separate from tasks with no date at all below —
+  // merging the two used to make dated-but-untimed tasks (e.g. "Clean car",
+  // due today) look identical to ones with no date whatsoever ("Paint Fence"),
+  // which read as a bug even though both were correctly categorised.
   anytimeHtml += '<div class="inbox-col-label"' + (overdue.length ? ' style="margin-top:20px;"' : '') + '>ANYTIME</div>';
-  const anytimeTasks = [...untimedToday, ...undated];
-  if (anytimeTasks.length) {
-    anytimeTasks.forEach(t => {
+  if (untimedToday.length || allDayEvents.length) {
+    untimedToday.forEach(t => {
       anytimeHtml += '<div class="anytime-row"><button aria-label="Mark complete" class="anytime-check" onclick="completeTask(' + t.id + ')"></button><div><div class="anytime-title">' + t.title + '</div>' + (t.tag ? '<span class="tl-tag" style="margin-top:5px;display:inline-block;">#' + t.tag + '</span>' : '') + '</div></div>';
+    });
+    allDayEvents.forEach(e => {
+      anytimeHtml += '<div class="anytime-row"><span style="width:16px;flex-shrink:0;text-align:center;color:var(--sage);">•</span><div class="anytime-title">' + e.title + '</div></div>';
     });
   } else {
     anytimeHtml += '<div style="font-size:12.5px;color:var(--text3);padding:6px 4px;">Nothing loose today.</div>';
   }
-  if (allDayEvents.length) {
-    allDayEvents.forEach(e => {
-      anytimeHtml += '<div class="anytime-row"><span style="width:16px;flex-shrink:0;text-align:center;color:var(--sage);">•</span><div class="anytime-title">' + e.title + '</div></div>';
+  if (undated.length) {
+    anytimeHtml += '<div class="inbox-col-label" style="margin-top:20px;">NO DATE</div>';
+    undated.forEach(t => {
+      anytimeHtml += '<div class="anytime-row"><button aria-label="Mark complete" class="anytime-check" onclick="completeTask(' + t.id + ')"></button><div><div class="anytime-title">' + t.title + '</div>' + (t.tag ? '<span class="tl-tag" style="margin-top:5px;display:inline-block;">#' + t.tag + '</span>' : '') + '</div></div>';
     });
   }
   if (anytimeEl) anytimeEl.innerHTML = anytimeHtml;
