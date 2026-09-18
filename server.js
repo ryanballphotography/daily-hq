@@ -1,9 +1,21 @@
+// Must be set before any Date/chrono parsing happens: hosting platforms
+// default to UTC, but "3pm" typed by a UK user means 3pm Europe/London
+// (GMT/BST switch handled automatically) — also corrects the Siri endpoint's
+// "today" calculation near the UTC/local day boundary.
+process.env.TZ = 'Europe/London';
+
 require('dotenv').config();
 const fetch = require('node-fetch');
 const express = require('express');
 const { Pool } = require('pg');
 const path = require('path');
 const cookieParser = require('cookie-parser');
+const { parseTask } = require('./lib/parseTask');
+
+// parseTask() returns priority 1 (default) / 2 (!) / 3 (!!). The tasks table's
+// p1/p2/p3 scale is inverted (p1 = highest), so an unmarked sentence lands on
+// the existing "low priority" default instead of flooding the High priority view.
+const PRIORITY_TO_DB = { 1: 'p3', 2: 'p2', 3: 'p1' };
 
 const app = express();
 app.set('trust proxy', 1);
@@ -118,6 +130,8 @@ async function checkAuth(req, res, next) {
 
 app.use(checkAuth);
 app.use(express.static(path.join(__dirname, 'public')));
+// Served as-is so the browser runs the exact same parsing code as the server.
+app.use('/lib', express.static(path.join(__dirname, 'lib')));
 
 // ── Login routes ──────────────────────────────────
 app.get('/login', (req, res) => {
@@ -277,6 +291,11 @@ async function initDB() {
   await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time_block VARCHAR(20) DEFAULT NULL`);
   await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ DEFAULT NULL`);
   await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
+  // Natural-language task capture (lib/parseTask.js): contact + the original
+  // sentence. Date/time reuse the existing due_date/time_block columns so the
+  // Pushover/Gmail reminder system keeps working unmodified.
+  await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS contact VARCHAR(100)`);
+  await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS raw_text TEXT`);
   await pool.query(`CREATE TABLE IF NOT EXISTS shoot_tasks (
     id SERIAL PRIMARY KEY,
     shoot_id VARCHAR(100) NOT NULL,
@@ -379,25 +398,85 @@ app.post('/api/siri/add-task', async (req, res) => {
   }
 });
 
-app.post('/api/tasks', async (req, res) => {
-  const { title, notes, due_date, priority, category, tag, recurring } = req.body;
+// Parses a raw task sentence and inserts it. Parsing never blocks the save:
+// an unparseable sentence still inserts, with title = raw text and everything
+// else null (see lib/parseTask.js).
+function toDateStr(d) { return d ? d.toISOString().split('T')[0] : null; }
+function toTimeStr(d, hasTime) {
+  if (!d || !hasTime) return null;
+  return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+async function insertParsedTask(sentence, { notes, category, recurring, source } = {}) {
+  const raw = (sentence || '').toString();
+  let parsed;
   try {
-    const result = await pool.query(
-      `INSERT INTO tasks (title, notes, due_date, priority, category, tag, recurring)
-       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [title, notes, due_date || null, priority || 'p3', category || 'work', tag || null, recurring || null]
-    );
+    parsed = parseTask(raw);
+  } catch (e) {
+    parsed = { title: '', dueAt: null, hasTime: false, project: null, priority: 1, contact: null, raw };
+  }
+  const title = parsed.title || raw || '(untitled)';
+  const dbPriority = PRIORITY_TO_DB[parsed.priority] || 'p3';
+  return pool.query(
+    `INSERT INTO tasks (title, notes, due_date, time_block, priority, category, tag, contact, recurring, raw_text, source)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
+    [title, notes || null, toDateStr(parsed.dueAt), toTimeStr(parsed.dueAt, parsed.hasTime), dbPriority, category || 'work', parsed.project, parsed.contact, recurring || null, parsed.raw, source || 'manual']
+  );
+}
+
+app.post('/api/tasks', async (req, res) => {
+  const { raw_text, notes, category, recurring } = req.body;
+  try {
+    const result = await insertParsedTask(raw_text, { notes, category, recurring, source: 'manual' });
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// Single-sentence capture endpoint — same parsing path as the web form, for
+// future integrations (Shortcuts, email-to-task, etc). Distinct from the
+// existing /api/siri/add-task, which uses its own Claude-based parsing.
+app.post('/api/inbox', async (req, res) => {
+  const { raw_text, text, notes, category, recurring } = req.body;
+  try {
+    const result = await insertParsedTask(raw_text || text, { notes, category, recurring, source: 'inbox' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Columns editable via PATCH — also guards against req.body keys being used
+// unsanitised as SQL column names (matches the allow-list pattern already
+// used by PATCH /api/marketing-contacts/:id below).
+const TASK_PATCH_ALLOWED = ['title', 'notes', 'due_date', 'time_block', 'priority', 'category', 'tag', 'contact', 'recurring', 'raw_text', 'done', 'completed_at', 'snoozed_until', 'sort_order', 'reminder_sent_at'];
+
 app.patch('/api/tasks/:id', async (req, res) => {
   const { id } = req.params;
-  const fields = req.body;
-  const keys = Object.keys(fields);
-  const values = Object.values(fields);
+  const fields = { ...req.body };
+
+  // Editing the sentence re-derives every parsed field — the sentence is the
+  // source of truth, so this overrides any of these keys also sent as-is.
+  if ('raw_text' in fields) {
+    let parsed;
+    try {
+      parsed = parseTask(fields.raw_text || '');
+    } catch (e) {
+      parsed = { title: '', dueAt: null, hasTime: false, project: null, priority: 1, contact: null, raw: fields.raw_text || '' };
+    }
+    fields.title = parsed.title || fields.raw_text || '(untitled)';
+    fields.due_date = toDateStr(parsed.dueAt);
+    fields.time_block = toTimeStr(parsed.dueAt, parsed.hasTime);
+    fields.priority = PRIORITY_TO_DB[parsed.priority] || 'p3';
+    fields.tag = parsed.project;
+    fields.contact = parsed.contact;
+    fields.raw_text = parsed.raw;
+  }
+
+  const keys = Object.keys(fields).filter(k => TASK_PATCH_ALLOWED.includes(k));
+  if (!keys.length) return res.status(400).json({ error: 'No valid fields' });
+  const values = keys.map(k => fields[k]);
   const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
   try {
     const result = await pool.query(
@@ -432,9 +511,9 @@ app.patch('/api/tasks/:id/complete', async (req, res) => {
       if (task.recurring === 'weekly') next.setDate(next.getDate() + 7);
       if (task.recurring === 'monthly') next.setMonth(next.getMonth() + 1);
       await pool.query(
-        `INSERT INTO tasks (title, notes, due_date, priority, category, tag, recurring, source)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [task.title, task.notes, next.toISOString().split('T')[0], task.priority, task.category, task.tag, task.recurring, task.source]
+        `INSERT INTO tasks (title, notes, due_date, time_block, priority, category, tag, contact, recurring, source, raw_text)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [task.title, task.notes, next.toISOString().split('T')[0], task.time_block, task.priority, task.category, task.tag, task.contact, task.recurring, task.source, task.raw_text]
       );
     }
     res.json(task);

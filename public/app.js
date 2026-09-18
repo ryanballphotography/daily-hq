@@ -119,19 +119,37 @@ function formatDate(due) {
   return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
+// Bang count that would re-derive the task's current DB priority when reparsed.
+const PRIORITY_TO_BANGS = { p1: '!!', p2: '!', p3: '' };
+
+// Tasks created before the sentence parser existed (or edited via the old
+// field-based flow) have no raw_text. Reconstruct an equivalent sentence from
+// their structured fields so reopening+saving without changes doesn't lose
+// the due date/time/priority/tag — dates are written as ISO (YYYY-MM-DD),
+// which chrono reads unambiguously regardless of locale.
+function taskToSentence(t) {
+  if (t.raw_text) return t.raw_text;
+  let s = t.title || '';
+  if (t.tag) s += ' #' + t.tag;
+  if (t.due_date) {
+    s += ' ' + t.due_date.split('T')[0];
+    if (t.time_block) s += ' ' + t.time_block;
+  }
+  const bangs = PRIORITY_TO_BANGS[t.priority];
+  if (bangs) s += ' ' + bangs;
+  return s.trim();
+}
+
 async function editTask(id) {
   const t = tasks.find(t => t.id === id);
   if (!t) return;
-  document.getElementById('m-title').value = t.title;
+  document.getElementById('m-title').value = taskToSentence(t);
   document.getElementById('m-notes').value = t.notes || '';
-  document.getElementById('m-due').value = t.due_date ? t.due_date.split('T')[0] : '';
-  document.getElementById('m-time').value = t.time_block || '';
-  document.getElementById('m-priority').value = t.priority || 'p3';
   document.getElementById('m-category').value = t.category || 'work';
   document.getElementById('m-recurring').value = t.recurring || '';
-  document.getElementById('m-tag').value = t.tag || '';
   document.getElementById('modal-bg').classList.remove('hidden');
   document.getElementById('modal-bg')._editId = id;
+  updatePreview();
   setTimeout(() => document.getElementById('m-title').focus(), 50);
 }
 
@@ -145,7 +163,8 @@ function taskHTML(t) {
         <div class="task-title">${t.title}</div>
         <div class="task-meta">
           <span class="tag tag-${cat}">${cat}</span>
-          ${t.tag ? '<span class="tag">' + t.tag + '</span>' : ''}
+          ${t.tag ? '<span class="tag">#' + t.tag + '</span>' : ''}
+          ${t.contact ? '<span class="tag">@' + t.contact + '</span>' : ''}
           ${t.due_date ? '<span class="task-date ' + (od ? 'overdue' : '') + '">' + (od ? '⚠ ' : '') + formatDate(t.due_date) + '</span>' : ''}
           ${t.time_block ? '<span class="task-time">🕐 ' + t.time_block + '</span>' : ''}
           ${t.recurring ? '<span class="tag">↻ ' + t.recurring + '</span>' : ''}
@@ -309,19 +328,51 @@ async function editCompletedTask(id) {
   const done = await res.json();
   const t = done.find(t => t.id === id);
   if (!t) return;
-  document.getElementById('m-title').value = t.title;
+  document.getElementById('m-title').value = taskToSentence(t);
   document.getElementById('m-notes').value = t.notes || '';
-  document.getElementById('m-due').value = t.due_date ? t.due_date.split('T')[0] : '';
-  document.getElementById('m-priority').value = t.priority || 'p3';
   document.getElementById('m-category').value = t.category || 'work';
   document.getElementById('m-recurring').value = t.recurring || '';
-  document.getElementById('m-tag').value = t.tag || '';
   const doneEl = document.getElementById('m-done');
   if (doneEl) doneEl.checked = t.done || false;
   document.getElementById('modal-bg').classList.remove('hidden');
   document.getElementById('modal-bg')._editId = id;
   document.getElementById('modal-bg')._wasCompleted = t.done || false;
+  updatePreview();
   setTimeout(() => document.getElementById('m-title').focus(), 50);
+}
+
+// ── Live parse preview ────────────────────────────────────────────────────
+function formatPreview(p) {
+  const parts = [];
+  if (p.dueAt) {
+    const d = new Date(p.dueAt);
+    const weekday = d.toLocaleDateString('en-GB', { weekday: 'short' });
+    const month = d.toLocaleDateString('en-GB', { month: 'short' });
+    let dateStr = weekday + ' ' + d.getDate() + ' ' + month;
+    if (p.hasTime) {
+      dateStr += ', ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+    parts.push(dateStr);
+  } else {
+    parts.push('no date detected');
+  }
+  if (p.project) parts.push('#' + p.project);
+  if (p.contact) parts.push(p.contact);
+  if (p.priority > 1) parts.push('priority ' + p.priority);
+  return parts.join(' · ');
+}
+
+function updatePreview() {
+  const el = document.getElementById('m-preview');
+  const text = document.getElementById('m-title').value;
+  if (!text.trim()) { el.textContent = ''; return; }
+  el.textContent = formatPreview(parseTask(text));
+}
+
+let previewTimer = null;
+function schedulePreview() {
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(updatePreview, 200);
 }
 
 function bindModal() {
@@ -334,16 +385,15 @@ function bindModal() {
 })();
   document.getElementById('modal-save').addEventListener('click', saveModal);
   document.getElementById('m-title').addEventListener('keydown', e => { if (e.key === 'Enter') saveModal(); });
+  document.getElementById('m-title').addEventListener('input', schedulePreview);
 }
 
 function openModal() {
   document.getElementById('m-title').value = '';
   document.getElementById('m-notes').value = '';
-  document.getElementById('m-due').value = today;
-  document.getElementById('m-priority').value = 'p3';
   document.getElementById('m-category').value = 'work';
   document.getElementById('m-recurring').value = '';
-  document.getElementById('m-tag').value = '';
+  document.getElementById('m-preview').textContent = '';
   document.getElementById("modal-bg").classList.remove('hidden');
   setTimeout(() => document.getElementById('m-title').focus(), 50);
 }
@@ -351,9 +401,8 @@ function openModal() {
 function closeModal() { document.getElementById("modal-bg").classList.add('hidden'); }
 
 async function saveModal() {
-  const title = document.getElementById('m-title').value.trim();
-  if (!title) return;
-  const due = document.getElementById('m-due').value;
+  const rawText = document.getElementById('m-title').value.trim();
+  if (!rawText) return;
   const editId = document.getElementById('modal-bg')._editId;
   const markDone = document.getElementById('m-done') && document.getElementById('m-done').checked;
   const wasCompleted = document.getElementById('modal-bg')._wasCompleted || false;
@@ -380,42 +429,28 @@ async function saveModal() {
     return;
   }
   if (editId) {
-    // Edit existing task
-    await fetch('/api/tasks/' + editId, {
+    // Edit existing task — the sentence is re-parsed server-side, which stays
+    // the single source of truth for the derived fields.
+    const res = await fetch('/api/tasks/' + editId, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        title,
+        raw_text: rawText,
         notes: document.getElementById('m-notes').value,
-        due_date: due || null,
-        time_block: document.getElementById('m-time').value || null,
-        priority: document.getElementById('m-priority').value,
         category: document.getElementById('m-category').value,
-        recurring: document.getElementById('m-recurring').value,
-        tag: document.getElementById('m-tag').value
+        recurring: document.getElementById('m-recurring').value
       })
     });
-    const t = tasks.find(t => t.id === editId);
-    if (t) {
-      t.title = title;
-      t.notes = document.getElementById('m-notes').value;
-      t.due_date = due || null;
-      t.time_block = document.getElementById('m-time').value || null;
-      t.priority = document.getElementById('m-priority').value;
-      t.category = document.getElementById('m-category').value;
-      t.recurring = document.getElementById('m-recurring').value;
-      t.tag = document.getElementById('m-tag').value;
-    }
+    const updated = await res.json();
+    const idx = tasks.findIndex(t => t.id === editId);
+    if (idx !== -1) tasks[idx] = updated;
     document.getElementById('modal-bg')._editId = undefined;
   } else {
     await createTask({
-      title,
+      raw_text: rawText,
       notes: document.getElementById('m-notes').value,
-      due_date: due || null,
-      priority: document.getElementById('m-priority').value,
       category: document.getElementById('m-category').value,
-      recurring: document.getElementById('m-recurring').value,
-      tag: document.getElementById('m-tag').value
+      recurring: document.getElementById('m-recurring').value
     });
     const idx = document.getElementById('modal-bg')._proposalIndex;
     if (idx !== undefined) {
@@ -629,17 +664,17 @@ function acceptProposal(i) {
   const el = document.getElementById('inbox-proposals');
   const p = el._proposals[i];
   if (!p) return;
-  // Open modal pre-filled with proposal data
-  document.getElementById('m-title').value = p.suggestedTask;
+  // Open modal pre-filled with proposal data. Priority carries over as bangs
+  // so the parser derives the same p1/p2/p3 the proposal suggested; the
+  // sender isn't a clean @Contact so it stays in notes instead.
+  const bangs = PRIORITY_TO_BANGS[p.priority] || '';
+  document.getElementById('m-title').value = (p.suggestedTask || '') + (bangs ? ' ' + bangs : '');
   document.getElementById('m-notes').value = p.action + ' (from: ' + p.from + ')';
-  document.getElementById('m-due').value = '';
-  document.getElementById('m-time').value = '';
-  document.getElementById('m-priority').value = p.priority || 'p3';
   document.getElementById('m-category').value = 'work';
   document.getElementById('m-recurring').value = '';
-  document.getElementById('m-tag').value = p.from;
   document.getElementById('modal-bg').classList.remove('hidden');
   document.getElementById('modal-bg')._proposalIndex = i;
+  updatePreview();
   setTimeout(() => document.getElementById('m-title').focus(), 50);
 }
 

@@ -251,29 +251,12 @@
       <div class="modal-body">
         <div class="modal-field">
           <label>Task</label>
-          <input type="text" id="m-title" placeholder="What needs doing?" />
+          <input type="text" id="m-title" placeholder="e.g. Invoice Lidl IE #admin Friday 3pm !!" autocomplete="off" />
+          <div id="m-preview" style="font-size:12px;color:var(--text3);margin-top:6px;min-height:1.4em;"></div>
         </div>
         <div class="modal-field">
           <label>Notes</label>
           <textarea id="m-notes" placeholder="Any extra detail..."></textarea>
-        </div>
-        <div class="modal-row">
-          <div class="modal-field">
-            <label>Due date</label>
-            <input type="date" id="m-due" />
-          </div>
-          <div class="modal-field">
-            <label>Time</label>
-            <input type="time" id="m-time" />
-          </div>
-          <div class="modal-field">
-            <label>Priority</label>
-            <select id="m-priority">
-              <option value="p3">P3 — low</option>
-              <option value="p2">P2 — medium</option>
-              <option value="p1">P1 — high</option>
-            </select>
-          </div>
         </div>
         <div class="modal-row">
           <div class="modal-field">
@@ -294,10 +277,6 @@
               <option value="monthly">Monthly</option>
             </select>
           </div>
-        </div>
-        <div class="modal-field">
-          <label>Tag</label>
-          <input type="text" id="m-tag" placeholder="e.g. Lidl, Admin" />
         </div>
         <div class="modal-field" style="display:flex;align-items:center;gap:8px;margin-top:0.5rem;">
           <input type="checkbox" id="m-done" style="width:16px;height:16px;cursor:pointer;" />
@@ -346,6 +325,8 @@
     <div class="mobile-more-item" onclick="window.open('https://app.freeagent.com','_blank');toggleMoreSheet()"><i class="ti ti-receipt"></i> FreeAgent</div>
   </div>
 
+  <script src="vendor/chrono.bundle.js"></script>
+  <script src="/lib/parseTask.js"></script>
   <script src="app.js"></script>
 
   <!-- Contact modal -->
