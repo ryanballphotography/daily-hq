@@ -7,10 +7,19 @@ process.env.TZ = 'Europe/London';
 require('dotenv').config();
 const fetch = require('node-fetch');
 const express = require('express');
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const { parseTask } = require('./lib/parseTask');
+
+// pg parses DATE columns into a JS Date at LOCAL midnight, and res.json()
+// then serialises Dates via toISOString() (UTC). During BST (UTC+1) that
+// walks local midnight back into the previous UTC day, so every due_date
+// came back one day early — regardless of what was actually stored. A SQL
+// DATE has no time/timezone component, so keep it as the plain "YYYY-MM-DD"
+// string Postgres sends over the wire instead of round-tripping it through
+// Date at all. OID 1082 = date.
+types.setTypeParser(1082, val => val);
 
 // parseTask() returns priority 1 (default) / 2 (!) / 3 (!!). The tasks table's
 // p1/p2/p3 scale is inverted (p1 = highest), so an unmarked sentence lands on
@@ -379,7 +388,7 @@ app.post('/api/siri/add-task', async (req, res) => {
   if (!title) return res.status(400).json({ error: 'title is required' });
   let parsed = { title, due_date: null, time_block: null };
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = toDateStr(new Date());
     const dow = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
     const cr = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -405,7 +414,14 @@ app.post('/api/siri/add-task', async (req, res) => {
 // Parses a raw task sentence and inserts it. Parsing never blocks the save:
 // an unparseable sentence still inserts, with title = raw text and everything
 // else null (see lib/parseTask.js).
-function toDateStr(d) { return d ? d.toISOString().split('T')[0] : null; }
+// A date-only chrono match is built as local midnight, not "now" — so
+// toISOString() (always UTC) walks it back a calendar day for the entire
+// day, every day the UK is on BST (UTC+1), not just near midnight. Read the
+// date back out in local time instead, matching how it went in.
+function toDateStr(d) {
+  if (!d) return null;
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 function toTimeStr(d, hasTime) {
   if (!d || !hasTime) return null;
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
@@ -517,7 +533,7 @@ app.patch('/api/tasks/:id/complete', async (req, res) => {
       await pool.query(
         `INSERT INTO tasks (title, notes, due_date, time_block, priority, category, tag, contact, recurring, source, raw_text)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [task.title, task.notes, next.toISOString().split('T')[0], task.time_block, task.priority, task.category, task.tag, task.contact, task.recurring, task.source, task.raw_text]
+        [task.title, task.notes, toDateStr(next), task.time_block, task.priority, task.category, task.tag, task.contact, task.recurring, task.source, task.raw_text]
       );
     }
     res.json(task);
