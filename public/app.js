@@ -436,7 +436,7 @@ function bindModal() {
 
   // Single-key shortcuts, as long as you're not typing somewhere else or the
   // modal is already open: n = new task, t/w/s/c/m = jump to a nav tab.
-  const NAV_SHORTCUTS = { i: 'inbox', t: 'today', w: 'timeline', s: 'scheduled', c: 'calendar', m: 'marketing' };
+  const NAV_SHORTCUTS = { i: 'inbox', t: 'today', l: 'timeline', s: 'scheduled', c: 'calendar', m: 'marketing' };
   document.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (!document.getElementById('modal-bg').classList.contains('hidden')) return;
@@ -714,6 +714,16 @@ function renderScheduled() {
 // undated tasks at the bottom. This used to live inside the Inbox as "your
 // day", but Inbox is capture-only now — this is its own view so it can grow
 // forward instead of being stuck showing just today.
+// Category → emoji, shown on task cards so the timeline reads at a glance
+// instead of as a wall of text. Skipped when the title already opens with
+// its own emoji (e.g. "🎯 Marketing Mondays") to avoid doubling up.
+const CATEGORY_EMOJI = { work: '💼', exercise: '🏃', home: '🏠', personal: '🌱' };
+const LEADING_EMOJI_RE = /^\p{Extended_Pictographic}/u;
+function taskEmoji(t) {
+  if (LEADING_EMOJI_RE.test(t.title)) return '';
+  return (CATEGORY_EMOJI[t.category] || '') + ' ';
+}
+
 function timelineRowsHTML(dayTasks, dayEvents, isToday) {
   const timedEvents = dayEvents.filter(e => !e.allDay);
   const allDayEvents = dayEvents.filter(e => e.allDay);
@@ -741,11 +751,11 @@ function timelineRowsHTML(dayTasks, dayEvents, isToday) {
     if (isToday && !placed && entry.time > nowStr) { html += nowRow; placed = true; }
     const isLast = i === entries.length - 1;
     if (entry.kind === 'event') {
-      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><div class="tl-dot"></div>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-event-title">' + entry.title + '</div></div></div>';
+      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><div class="tl-dot"></div>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-event-chip">📅 ' + entry.title + '</div></div></div>';
     } else {
       const t = entry.task;
       const checkClass = t.priority === 'p1' ? ' p1' : t.priority === 'p2' ? ' p2' : '';
-      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><button aria-label="Mark complete" class="tl-check' + checkClass + '" onclick="completeTask(' + t.id + ')"></button>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-card" ondblclick="editTask(' + t.id + ')"><div class="tl-task-title">' + t.title + '</div>' + (t.tag ? '<span class="tl-tag">#' + t.tag + '</span>' : '') + '<i class="ti ti-pencil task-del" onclick="editTask(' + t.id + ')" style="position:absolute;top:8px;right:10px;"></i></div></div></div>';
+      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><button aria-label="Mark complete" class="tl-check' + checkClass + '" onclick="completeTask(' + t.id + ')"></button>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-card" ondblclick="editTask(' + t.id + ')"><div class="tl-task-title">' + taskEmoji(t) + t.title + '</div>' + (t.tag ? '<span class="tl-tag">#' + t.tag + '</span>' : '') + '<i class="ti ti-pencil task-del" onclick="editTask(' + t.id + ')" style="position:absolute;top:8px;right:10px;"></i></div></div></div>';
     }
   });
   if (isToday && !placed) html += nowRow;
