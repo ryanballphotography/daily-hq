@@ -549,33 +549,6 @@ app.get("/api/tasks/completed", async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post("/api/pa/briefing", async (req, res) => {
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify(req.body)
-    });
-    const data = await response.json();
-    if (data.quotes) data.quotes = data.quotes.filter(q => q.name && q.name.trim() && q.name !== "New Quote" && q.clientName && q.clientName.trim());
-    res.json(data);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post("/api/pa/chat", async (req, res) => {
-  try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
-      body: JSON.stringify(req.body)
-    });
-    const data = await response.json();
-    if (data.quotes) data.quotes = data.quotes.filter(q => q.name && q.name.trim() && q.name !== "New Quote" && q.clientName && q.clientName.trim());
-    res.json(data);
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-
 app.get("/api/calendar", async (req, res) => {
   try {
     const response = await fetch("https://shoot-planner.ryanballphotography.com/api/calendar-events", {
