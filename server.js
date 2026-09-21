@@ -12,6 +12,7 @@ const path = require('path');
 const cookieParser = require('cookie-parser');
 const { parseTask } = require('./lib/parseTask');
 const { londonParts, minutesToHHMM } = require('./lib/londonTime');
+const { nextOccurrence } = require('./lib/recurrence');
 
 // pg parses DATE columns into a JS Date at LOCAL midnight, and res.json()
 // then serialises Dates via toISOString() (UTC). During BST (UTC+1) that
@@ -521,20 +522,26 @@ app.delete('/api/tasks/:id', async (req, res) => {
 
 app.patch('/api/tasks/:id/complete', async (req, res) => {
   try {
+    // Only the request that actually flips done -> true may spawn the next
+    // occurrence, so a double-click can't create two.
     const result = await pool.query(
-      `UPDATE tasks SET done = true, completed_at = NOW() WHERE id = $1 RETURNING *`,
+      `UPDATE tasks SET done = true, completed_at = NOW() WHERE id = $1 AND done IS NOT TRUE RETURNING *`,
       [req.params.id]
     );
+    if (!result.rows.length) {
+      const existing = await pool.query('SELECT * FROM tasks WHERE id = $1', [req.params.id]);
+      if (!existing.rows.length) return res.status(404).json({ error: 'Task not found' });
+      return res.json(existing.rows[0]);
+    }
     const task = result.rows[0];
-    if (task.recurring && task.due_date) {
-      const next = new Date(task.due_date);
-      if (task.recurring === 'daily') next.setDate(next.getDate() + 1);
-      if (task.recurring === 'weekly') next.setDate(next.getDate() + 7);
-      if (task.recurring === 'monthly') next.setMonth(next.getMonth() + 1);
+    const nextDue = task.recurring && task.due_date
+      ? nextOccurrence(task.due_date, task.recurring, londonParts().date)
+      : null;
+    if (nextDue) {
       await pool.query(
         `INSERT INTO tasks (title, notes, due_date, time_block, priority, category, tag, contact, recurring, source, raw_text)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [task.title, task.notes, toDateStr(next), task.time_block, task.priority, task.category, task.tag, task.contact, task.recurring, task.source, task.raw_text]
+        [task.title, task.notes, nextDue, task.time_block, task.priority, task.category, task.tag, task.contact, task.recurring, task.source, task.raw_text]
       );
     }
     res.json(task);
