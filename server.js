@@ -11,6 +11,7 @@ const { Pool, types } = require('pg');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const { parseTask } = require('./lib/parseTask');
+const { londonParts, minutesToHHMM } = require('./lib/londonTime');
 
 // pg parses DATE columns into a JS Date at LOCAL midnight, and res.json()
 // then serialises Dates via toISOString() (UTC). During BST (UTC+1) that
@@ -828,15 +829,15 @@ async function sendEmail(subject, body) {
 async function checkReminders() {
   console.log('Checking reminders at', new Date().toISOString());
   try {
-    const now = new Date();
-    const in30 = new Date(now.getTime() + 30 * 60 * 1000);
-    const pad = n => String(n).padStart(2,'0');
-    // Convert UTC to BST (UTC+1) for comparison with stored time_block values
-    const bstNow = new Date(now.getTime() + 60 * 60 * 1000);
-    const bstIn30 = new Date(in30.getTime() + 60 * 60 * 1000);
-    const nowStr = pad(bstNow.getUTCHours()) + ':' + pad(bstNow.getUTCMinutes());
-    const in30Str = pad(bstIn30.getUTCHours()) + ':' + pad(bstIn30.getUTCMinutes());
-    const todayStr = bstNow.toISOString().split('T')[0];
+    // time_block values are London wall-clock times; compare against London
+    // time in both GMT and BST rather than a fixed offset.
+    const now = londonParts(new Date());
+    const ahead = londonParts(new Date(Date.now() + 30 * 60 * 1000));
+    const todayStr = now.date;
+    const nowStr = now.time;
+    // The window can't extend past midnight: due_date is a single day.
+    const in30Str = ahead.date === now.date ? ahead.time : '23:59';
+    const tenAgoStr = minutesToHHMM(now.minutes - 10);
     console.log('Reminder window:', todayStr, nowStr, '->', in30Str);
     // Due within 30 mins, no reminder sent yet or last reminder > 35 mins ago
     const res = await pool.query(
@@ -851,7 +852,6 @@ async function checkReminders() {
       console.log('Reminder sent for:', task.title);
     }
     // 10 mins overdue and not done
-    const tenAgoStr = pad((bstNow.getUTCHours() * 60 + bstNow.getUTCMinutes() - 10) / 60 | 0) + ':' + pad((bstNow.getUTCHours() * 60 + bstNow.getUTCMinutes() - 10) % 60);
     const overdueRes = await pool.query(
       `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block >= $2 AND time_block < $3
        AND (reminder_sent_at IS NULL OR reminder_sent_at < NOW() - INTERVAL '15 minutes')`,
