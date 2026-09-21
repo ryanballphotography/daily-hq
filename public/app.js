@@ -717,6 +717,12 @@ function renderScheduled() {
 // Category → emoji, shown on task cards so the timeline reads at a glance
 // instead of as a wall of text. Skipped when the title already opens with
 // its own emoji (e.g. "🎯 Marketing Mondays") to avoid doubling up.
+// Calendar titles come from outside (shared/imported calendars), so anything
+// interpolated into innerHTML from them has to be escaped.
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 const CATEGORY_EMOJI = { work: '💼', exercise: '🏃', home: '🏠', personal: '🌱' };
 const LEADING_EMOJI_RE = /^\p{Extended_Pictographic}/u;
 function taskEmoji(t) {
@@ -734,9 +740,14 @@ function timelineRowsHTML(dayTasks, dayEvents, isToday) {
   // list with a blank time slot instead of living in a separate "Anytime"
   // panel — they used to look identical to tasks with no date at all, which
   // read as a bug even though both were correctly categorised.
+  // Some all-day calendar events have the real time typed into the title
+  // ("…Wells Cathedral 1830"); place those at that time instead of leaving
+  // them floating at the top of the day.
+  const allDayWithTime = allDayEvents.map(e => ({ e, t: extractTitleTime(e.title) }));
   const entries = [
     ...untimedTasks.map(t => ({ time: '', kind: 'task', task: t })),
-    ...allDayEvents.map(e => ({ time: '', kind: 'event', title: e.title })),
+    ...allDayWithTime.filter(x => !x.t).map(x => ({ time: '', kind: 'event', title: x.e.title })),
+    ...allDayWithTime.filter(x => x.t).map(x => ({ time: x.t.start, kind: 'event', title: x.e.title })),
     ...timedEvents.map(e => ({ time: new Date(e.start).toTimeString().slice(0, 5), kind: 'event', title: e.title })),
     ...timedTasks.map(t => ({ time: t.time_block, kind: 'task', task: t }))
   ].sort((a, b) => a.time.localeCompare(b.time));
@@ -751,11 +762,11 @@ function timelineRowsHTML(dayTasks, dayEvents, isToday) {
     if (isToday && !placed && entry.time > nowStr) { html += nowRow; placed = true; }
     const isLast = i === entries.length - 1;
     if (entry.kind === 'event') {
-      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><div class="tl-dot"></div>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-event-chip">📅 ' + entry.title + '</div></div></div>';
+      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><div class="tl-dot"></div>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-event-chip">📅 ' + esc(entry.title) + '</div></div></div>';
     } else {
       const t = entry.task;
       const checkClass = t.priority === 'p1' ? ' p1' : t.priority === 'p2' ? ' p2' : '';
-      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><button aria-label="Mark complete" class="tl-check' + checkClass + '" onclick="completeTask(' + t.id + ')"></button>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-card" ondblclick="editTask(' + t.id + ')"><div class="tl-task-title">' + taskEmoji(t) + t.title + '</div>' + (t.tag ? '<span class="tl-tag">#' + t.tag + '</span>' : '') + '<i class="ti ti-pencil task-del" onclick="editTask(' + t.id + ')" style="position:absolute;top:8px;right:10px;"></i></div></div></div>';
+      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><button aria-label="Mark complete" class="tl-check' + checkClass + '" onclick="completeTask(' + t.id + ')"></button>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-card" ondblclick="editTask(' + t.id + ')"><div class="tl-task-title">' + taskEmoji(t) + esc(t.title) + '</div>' + (t.tag ? '<span class="tl-tag">#' + esc(t.tag) + '</span>' : '') + '<i class="ti ti-pencil task-del" onclick="editTask(' + t.id + ')" style="position:absolute;top:8px;right:10px;"></i></div></div></div>';
     }
   });
   if (isToday && !placed) html += nowRow;
