@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindNav();
   bindModal();
   bindQuickAdd();
+  bindTimelineDnD();
   showInboxPrompt();
   loadContacts();
 });
@@ -60,7 +61,7 @@ function bindNav() {
       if (view === 'completed') renderCompleted();
       if (view === 'calendar') showCalendarView();
       if (view === 'inbox') showInboxPrompt();
-      if (view === 'timeline') renderTimelineFeed();
+      if (view === 'timeline') renderTimelineFeed(true);
       if (view === 'scheduled') renderScheduled();
       if (view === 'marketing') {
         loadContacts().then(() => {
@@ -132,14 +133,28 @@ const PRIORITY_TO_BANGS = { p1: '!!', p2: '!', p3: '' };
 // their structured fields so reopening+saving without changes doesn't lose
 // the due date/time/priority/tag — dates are written as ISO (YYYY-MM-DD),
 // which chrono reads unambiguously regardless of locale.
+// The original sentence is only safe to hand back for editing while it still
+// describes the task. Saving re-parses it server-side, so a stale one (task
+// dragged to another day, or typed as "friday" and opened next week) would
+// silently overwrite the real date with whatever the words parse to today.
+function rawTextStillMatches(t) {
+  const p = parseTask(t.raw_text);
+  const due = p.dueAt ? localDateStr(p.dueAt) : null;
+  const time = p.hasTime ? String(p.dueAt.getHours()).padStart(2, '0') + ':' + String(p.dueAt.getMinutes()).padStart(2, '0') : null;
+  return due === (t.due_date ? t.due_date.split('T')[0] : null) && time === (t.time_block || null);
+}
+
 function taskToSentence(t) {
-  if (t.raw_text) return t.raw_text;
+  if (t.raw_text && rawTextStillMatches(t)) return t.raw_text;
   let s = t.title || '';
   if (t.tag) s += ' #' + t.tag;
   if (t.due_date) {
     s += ' ' + t.due_date.split('T')[0];
     if (t.time_block) s += ' ' + t.time_block;
   }
+  // After the date, not before: the parser rejects an @Name that's followed
+  // by a digit (so "@10am" isn't read as a contact).
+  if (t.contact) s += ' @' + t.contact;
   const bangs = PRIORITY_TO_BANGS[t.priority];
   if (bangs) s += ' ' + bangs;
   return s.trim();
@@ -766,24 +781,33 @@ function timelineRowsHTML(dayTasks, dayEvents, isToday) {
     } else {
       const t = entry.task;
       const checkClass = t.priority === 'p1' ? ' p1' : t.priority === 'p2' ? ' p2' : '';
-      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><button aria-label="Mark complete" class="tl-check' + checkClass + '" onclick="completeTask(' + t.id + ')"></button>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-card" ondblclick="editTask(' + t.id + ')"><div class="tl-task-title">' + taskEmoji(t) + esc(t.title) + '</div>' + (t.tag ? '<span class="tl-tag">#' + esc(t.tag) + '</span>' : '') + '<i class="ti ti-pencil task-del" onclick="editTask(' + t.id + ')" style="position:absolute;top:8px;right:10px;"></i></div></div></div>';
+      html += '<div class="tl-row"><div class="tl-time">' + entry.time + '</div><div class="tl-rail"><button aria-label="Mark complete" class="tl-check' + checkClass + '" onclick="completeTask(' + t.id + ')"></button>' + (isLast && placed ? '' : '<div class="tl-line"></div>') + '</div><div class="tl-body"><div class="tl-card" draggable="true" data-task-id="' + t.id + '" ondblclick="editTask(' + t.id + ')"><div class="tl-task-title">' + taskEmoji(t) + esc(t.title) + '</div>' + (t.tag ? '<span class="tl-tag">#' + esc(t.tag) + '</span>' : '') + moveButtonsHTML(t.id) + '<i class="ti ti-pencil task-del" onclick="editTask(' + t.id + ')" style="position:absolute;top:8px;right:10px;"></i></div></div></div>';
     }
   });
   if (isToday && !placed) html += nowRow;
   return html;
 }
 
-async function renderTimelineFeed() {
+// Calendar events are cached briefly so a drag/complete doesn't refetch the
+// whole feed; navigating to the view or pull-to-refresh forces a fresh load.
+let timelineEvents = [];
+let timelineEventsAt = 0;
+
+async function renderTimelineFeed(force) {
   const el = document.getElementById('timeline-feed-body');
   if (!el) return;
 
-  let events = [];
-  try { events = await loadCalendarEvents(); } catch (e) { events = []; }
+  if (force || Date.now() - timelineEventsAt > 60000) {
+    try { timelineEvents = await loadCalendarEvents(); } catch (e) { timelineEvents = []; }
+    if (timelineEvents.length) timelineEventsAt = Date.now();
+  }
+  const events = timelineEvents;
 
   const overdue = tasks.filter(t => t.due_date && t.due_date.split('T')[0] < today);
   const undated = tasks.filter(t => !t.due_date);
 
-  const days = {};
+  // Today is always present so it's a drop target even when it's empty.
+  const days = { [today]: { tasks: [], events: [] } };
   const bucket = ds => (days[ds] = days[ds] || { tasks: [], events: [] });
   tasks.forEach(t => {
     if (!t.due_date) return;
@@ -793,24 +817,106 @@ async function renderTimelineFeed() {
   });
   events.forEach(e => bucket(e.start.split('T')[0]).events.push(e));
 
+  // Each day is a section carrying its date so a dragged task can be dropped
+  // on it. Overdue has no data-date (you can't reschedule *into* overdue).
   let html = '';
   if (overdue.length) {
-    html += '<div class="sched-day-label overdue">Overdue</div>';
-    html += overdue.map(taskHTML).join('');
+    html += '<div class="tl-day"><div class="sched-day-label overdue">Overdue</div>' + overdue.map(feedTaskHTML).join('') + '</div>';
   }
 
   Object.keys(days).sort().forEach(ds => {
     const d = new Date(ds + 'T00:00:00');
-    html += '<div class="sched-day-label">' + formatDayLabel(d) + '</div>';
-    html += timelineRowsHTML(days[ds].tasks, days[ds].events, ds === today);
+    html += '<div class="tl-day" data-date="' + ds + '"><div class="sched-day-label">' + formatDayLabel(d) + '</div>'
+      + timelineRowsHTML(days[ds].tasks, days[ds].events, ds === today) + '</div>';
   });
 
   if (undated.length) {
-    html += '<div class="sched-day-label" style="margin-top:1.5rem;">No date</div>';
-    html += undated.map(taskHTML).join('');
+    html += '<div class="tl-day" data-date=""><div class="sched-day-label">No date</div>' + undated.map(feedTaskHTML).join('') + '</div>';
   }
 
-  el.innerHTML = html || '<div class="empty">Nothing scheduled.</div>';
+  el.innerHTML = html;
+  el.querySelectorAll('.task[id^="task-"]').forEach(row => {
+    row.draggable = true;
+    row.dataset.taskId = row.id.slice(5);
+  });
+}
+
+// ── Reschedule: drag a task onto a day, or push it with +1d / +1w ────────────
+// Overdue / No date rows reuse the standard task row; slot the push buttons in
+// just before its edit pencil.
+function moveButtonsHTML(id) {
+  return '<span class="tl-move"><button title="Push a day" onclick="event.stopPropagation();pushTask(' + id + ',1)">+1d</button>'
+    + '<button title="Push a week" onclick="event.stopPropagation();pushTask(' + id + ',7)">+1w</button></span>';
+}
+
+function feedTaskHTML(t) {
+  return taskHTML(t).replace('<i class="ti ti-pencil', moveButtonsHTML(t.id) + '<i class="ti ti-pencil');
+}
+
+async function rescheduleTask(id, due) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  if ((t.due_date ? t.due_date.split('T')[0] : '') === (due || '')) return;
+  const before = { due_date: t.due_date, time_block: t.time_block };
+  // Optimistic: move it now, put it back if the save fails.
+  t.due_date = due || null;
+  if (!due) t.time_block = null;
+  renderTimelineFeed();
+  try {
+    const res = await fetch('/api/tasks/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(due ? { due_date: due } : { due_date: null, time_block: null })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  } catch (e) {
+    Object.assign(t, before);
+    renderTimelineFeed();
+    alert('Couldn’t reschedule that task — it’s been put back.');
+  }
+}
+
+// Push by n days from whichever is later: its due date or today, so pushing an
+// overdue task lands in the future rather than on another past date.
+function pushTask(id, days) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  const due = t.due_date ? t.due_date.split('T')[0] : today;
+  const d = new Date((due > today ? due : today) + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  rescheduleTask(id, localDateStr(d));
+}
+
+function bindTimelineDnD() {
+  const el = document.getElementById('timeline-feed-body');
+  if (!el) return;
+  const clear = () => el.querySelectorAll('.drop-target, .dragging').forEach(n => n.classList.remove('drop-target', 'dragging'));
+  const dayOf = e => { const d = e.target.closest && e.target.closest('.tl-day[data-date]'); return d && el.contains(d) ? d : null; };
+
+  el.addEventListener('dragstart', e => {
+    const item = e.target.closest && e.target.closest('[data-task-id]');
+    if (!item) return;
+    e.dataTransfer.setData('text/plain', item.dataset.taskId);
+    e.dataTransfer.effectAllowed = 'move';
+    item.classList.add('dragging');
+  });
+  el.addEventListener('dragover', e => {
+    const day = dayOf(e);
+    if (!day) return;
+    e.preventDefault();
+    el.querySelectorAll('.drop-target').forEach(n => { if (n !== day) n.classList.remove('drop-target'); });
+    day.classList.add('drop-target');
+  });
+  el.addEventListener('drop', e => {
+    const day = dayOf(e);
+    if (!day) return;
+    e.preventDefault();
+    const id = Number(e.dataTransfer.getData('text/plain'));
+    clear();
+    if (id) rescheduleTask(id, day.dataset.date);
+  });
+  el.addEventListener('dragend', clear);
+  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) clear(); });
 }
 
 
@@ -839,7 +945,7 @@ function mobileNav(view, tabEl) {
   if (view === 'completed') renderCompleted();
   if (view === 'calendar') showCalendarView();
   if (view === 'inbox') showInboxPrompt();
-  if (view === 'timeline') renderTimelineFeed();
+  if (view === 'timeline') renderTimelineFeed(true);
   if (view === 'scheduled') renderScheduled();
 }
 
@@ -885,7 +991,7 @@ async function refreshCurrentView() {
   if (view === 'completed') renderCompleted();
   if (view === 'calendar') showCalendarView();
   if (view === 'inbox') showInboxPrompt();
-  if (view === 'timeline') renderTimelineFeed();
+  if (view === 'timeline') renderTimelineFeed(true);
   if (view === 'scheduled') renderScheduled();
   if (view === 'marketing') {
     await loadContacts();

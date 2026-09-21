@@ -225,6 +225,19 @@ body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Seg
 .tl-card { position: relative; background: var(--bg2); border: 1px solid var(--border); border-radius: 11px; padding: 11px 15px; box-shadow: 0 1px 3px var(--shadow); cursor: pointer; }
 .tl-card .tl-task-title { font-size: 14px; font-weight: 600; color: var(--text); padding-right: 20px; }
 .tl-card:hover .task-del { opacity: 1; }
+
+/* Reschedule: +1d/+1w push buttons (revealed on hover, always on mobile where
+   there's no hover and no drag) and the drag-and-drop states. */
+.tl-move { display: inline-flex; gap: 4px; margin-right: 4px; opacity: 0; }
+.task:hover .tl-move, .tl-card:hover .tl-move { opacity: 1; }
+.tl-move button { font-size: 10.5px; font-weight: 700; color: var(--text3); background: var(--bg3); border: none; border-radius: 5px; padding: 2px 6px; cursor: pointer; font-family: inherit; }
+.tl-move button:hover { color: var(--accent); background: var(--accent-soft); }
+.tl-card .tl-move { position: absolute; top: 7px; right: 34px; }
+.tl-day { margin-top: 1.25rem; padding: 2px 0; border-radius: 10px; }
+.tl-day:first-child { margin-top: 0; }
+.tl-day.drop-target { background: var(--accent-soft); outline: 1.5px dashed var(--accent); outline-offset: 4px; }
+.tl-card.dragging, .task.dragging { opacity: 0.4; }
+.tl-card[draggable="true"] { cursor: grab; }
 .tl-check { width: 14px; height: 14px; margin-top: 9px; border-radius: 50%; border: 1.6px solid var(--accent); background: var(--bg); flex-shrink: 0; cursor: pointer; padding: 0; }
 .tl-check.p1 { border-color: var(--p1); }
 .tl-check.p2 { border-color: var(--p2); }
@@ -268,6 +281,7 @@ body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Seg
   .task { padding: 10px 8px; }
   .task-title { font-size: 14px; }
   .task-del { opacity: 1; }
+  .tl-move { opacity: 1; }
 
   /* Inbox */
   .inbox-card { padding: 14px; }
