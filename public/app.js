@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
   bindModal();
   bindQuickAdd();
   bindTimelineDnD();
+  bindCmdk();
   showInboxPrompt();
   loadContacts();
 });
@@ -974,6 +975,119 @@ function syncMobileBadges() {
   }
 }
 
+
+// ── Command palette (Cmd/Ctrl+K) ─────────────────────────────────────────────
+// Jump to a view, find a task, or add one from a sentence. Matching views and
+// tasks rank first and "Add task" comes last, so Enter on a search can't
+// create a task by accident — unless nothing matches, in which case adding is
+// the only thing on offer. Cmd/Ctrl+Enter always adds.
+const CMDK_VIEWS = [
+  { view: 'inbox', label: 'Inbox', icon: 'ti-inbox' },
+  { view: 'today', label: 'Today', icon: 'ti-layout-dashboard' },
+  { view: 'timeline', label: 'Timeline', icon: 'ti-timeline' },
+  { view: 'scheduled', label: 'Scheduled', icon: 'ti-list-details' },
+  { view: 'calendar', label: 'Calendar', icon: 'ti-calendar' },
+  { view: 'marketing', label: 'Marketing', icon: 'ti-speakerphone' },
+  { view: 'all', label: 'All Tasks', icon: 'ti-list-check' },
+  { view: 'completed', label: 'Completed', icon: 'ti-circle-check' }
+];
+
+function cmdkItems(query, taskList) {
+  const q = query.trim();
+  const needle = q.toLowerCase();
+  const items = [];
+  (needle ? CMDK_VIEWS.filter(v => v.label.toLowerCase().includes(needle)) : CMDK_VIEWS)
+    .forEach(v => items.push({ kind: 'view', view: v.view, label: v.label, icon: v.icon }));
+  if (needle) {
+    taskList
+      .filter(t => [t.title, t.tag, t.contact].some(x => x && String(x).toLowerCase().includes(needle)))
+      .slice(0, 8)
+      .forEach(t => items.push({ kind: 'task', id: t.id, label: t.title, icon: 'ti-circle', meta: t.due_date ? formatDate(t.due_date) : 'No date' }));
+    items.push({ kind: 'add', text: q, label: 'Add task: ' + q, icon: 'ti-plus', meta: formatPreview(parseTask(q)) });
+  } else {
+    items.unshift({ kind: 'new', label: 'New task…', icon: 'ti-plus' });
+  }
+  return items;
+}
+
+const cmdk = { items: [], sel: 0 };
+
+function renderCmdk() {
+  const list = document.getElementById('cmdk-list');
+  list.innerHTML = cmdk.items.map((it, i) =>
+    '<div class="cmdk-item' + (i === cmdk.sel ? ' sel' : '') + (it.kind === 'add' ? ' add' : '') + '" data-i="' + i + '">'
+    + '<i class="ti ' + it.icon + '"></i><span class="cmdk-label">' + esc(it.label) + '</span>'
+    + (it.meta ? '<span class="cmdk-meta">' + esc(it.meta) + '</span>' : '') + '</div>').join('')
+    || '<div class="cmdk-item"><span class="cmdk-label" style="color:var(--text3)">No results</span></div>';
+}
+
+function updateCmdk() {
+  cmdk.items = cmdkItems(document.getElementById('cmdk-input').value, tasks);
+  cmdk.sel = 0;
+  renderCmdk();
+}
+
+function openCmdk() {
+  document.getElementById('cmdk-bg').classList.remove('hidden');
+  const input = document.getElementById('cmdk-input');
+  input.value = '';
+  updateCmdk();
+  input.focus();
+}
+
+function closeCmdk() { document.getElementById('cmdk-bg').classList.add('hidden'); }
+
+async function runCmdkItem(it) {
+  if (!it) return;
+  closeCmdk();
+  if (it.kind === 'view') document.querySelector('.ni[data-view="' + it.view + '"]').click();
+  else if (it.kind === 'task') editTask(it.id);
+  else if (it.kind === 'new') openModal();
+  else if (it.kind === 'add') await createTask({ raw_text: it.text, category: 'work', recurring: '' });
+}
+
+function bindCmdk() {
+  const bg = document.getElementById('cmdk-bg');
+  const input = document.getElementById('cmdk-input');
+  const list = document.getElementById('cmdk-list');
+  if (!bg) return;
+
+  document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      if (bg.classList.contains('hidden')) openCmdk(); else closeCmdk();
+    }
+  });
+
+  input.addEventListener('input', updateCmdk);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { e.preventDefault(); closeCmdk(); }
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!cmdk.items.length) return;
+      cmdk.sel = (cmdk.sel + (e.key === 'ArrowDown' ? 1 : -1) + cmdk.items.length) % cmdk.items.length;
+      renderCmdk();
+      const cur = list.children[cmdk.sel];
+      if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      // Cmd/Ctrl+Enter: add the text as a task no matter what's highlighted.
+      const it = (e.metaKey || e.ctrlKey) ? cmdk.items.find(i => i.kind === 'add') : cmdk.items[cmdk.sel];
+      runCmdkItem(it);
+    }
+  });
+  list.addEventListener('click', e => {
+    const row = e.target.closest('[data-i]');
+    if (row) runCmdkItem(cmdk.items[Number(row.dataset.i)]);
+  });
+  list.addEventListener('mousemove', e => {
+    const row = e.target.closest('[data-i]');
+    if (!row || Number(row.dataset.i) === cmdk.sel) return;
+    cmdk.sel = Number(row.dataset.i);
+    list.querySelectorAll('.cmdk-item').forEach((n, i) => n.classList.toggle('sel', i === cmdk.sel));
+  });
+  bg.addEventListener('mousedown', e => { if (e.target === bg) closeCmdk(); });
+}
 
 // ── Pull to refresh ───────────────────────────────────────────────────────────
 // The app shell doesn't scroll on mobile (body has overflow:hidden) — each

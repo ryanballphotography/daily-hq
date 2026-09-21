@@ -971,3 +971,19 @@ body { font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Seg
 .mkt-row-advance:hover { opacity: 0.85; }
 
 .task-time { font-size: 11px; color: var(--text2); background: var(--bg2); border-radius: 4px; padding: 1px 6px; }
+
+/* ── Command palette ── */
+.cmdk-bg { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.5); align-items: flex-start; justify-content: center; padding-top: 14vh; }
+.cmdk-bg:not(.hidden) { display: flex; }
+.cmdk { width: min(580px, 92vw); background: var(--bg2); border: 1px solid var(--border2); border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.45); overflow: hidden; }
+.cmdk input { width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--border); padding: 16px 18px; font-size: 16px; font-family: inherit; color: var(--text); outline: none; }
+.cmdk-list { max-height: 50vh; overflow-y: auto; padding: 6px; }
+.cmdk-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--text); }
+.cmdk-item i { font-size: 16px; color: var(--text3); flex-shrink: 0; }
+.cmdk-item .cmdk-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmdk-item .cmdk-meta { font-size: 12px; color: var(--text3); flex-shrink: 0; }
+.cmdk-item.sel { background: var(--accent-soft); }
+.cmdk-item.sel i { color: var(--accent); }
+.cmdk-item.add .cmdk-label { color: var(--accent); font-weight: 600; }
+.cmdk-hint { display: flex; gap: 16px; padding: 9px 16px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text3); }
+@media (max-width: 768px) { .cmdk-hint { display: none; } .cmdk-bg { padding-top: 8vh; } }

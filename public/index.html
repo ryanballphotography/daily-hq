@@ -48,6 +48,7 @@
       <div class="topbar">
         <span class="topbar-title" id="topbar-title">Inbox</span>
         <span class="topbar-date" id="topbar-date"></span>
+        <button class="dark-toggle" id="cmdk-open" onclick="openCmdk()" title="Search and jump (Cmd/Ctrl+K)"><i class="ti ti-search"></i></button>
         <button class="dark-toggle" id="dark-toggle" onclick="toggleDark()" title="Toggle dark mode"><i class="ti ti-moon"></i></button>
         <button class="btn-add" id="btn-add-task"><i class="ti ti-plus"></i> Add task</button>
       </div>
@@ -209,6 +210,15 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- Command palette (Cmd/Ctrl+K): jump to a view, find a task, or add one -->
+  <div class="cmdk-bg hidden" id="cmdk-bg">
+    <div class="cmdk" role="dialog" aria-label="Search and jump">
+      <input type="text" id="cmdk-input" placeholder="Add a task, find one, or jump to a view…" autocomplete="off" spellcheck="false" />
+      <div class="cmdk-list" id="cmdk-list"></div>
+      <div class="cmdk-hint"><span>&uarr;&darr; move</span><span>&crarr; select</span><span>&#8984;&crarr; add as task</span><span>esc close</span></div>
     </div>
   </div>
 
