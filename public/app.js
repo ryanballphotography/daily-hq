@@ -283,13 +283,16 @@ function renderToday() {
 
   let html = '';
   if (overdue.length) html += makeSection('Overdue', overdue, false);
-  if (dueToday.length) html += makeSection('Today', dueToday, false);
+  // Unlike the other sections, Today never disappears when it's empty — it's
+  // the one thing this tab exists to answer, and a silent gap where it
+  // should be reads as broken rather than as "nothing's due".
+  html += '<div class="section-lbl">Today</div>';
+  html += dueToday.length ? dueToday.map(taskHTML).join('') : '<div class="empty" style="padding:0.5rem 0 1rem;text-align:left;">Nothing due today.</div>';
   if (p1NoDue.length) html += makeSection('High priority', p1NoDue, false);
   if (thisWeek.length) html += makeSection('This week', thisWeek, false);
   if (nextWeek.length) html += makeSection('Next week', nextWeek, true);
   if (upNext.length) html += makeSection('Up next', upNext, true);
   if (undated.length) html += makeSection('No date', undated, true);
-  if (!html) html = '<div class="empty">Nothing on your plate. Add a task or enjoy the quiet.</div>';
   el.innerHTML = html;
   // Attach section toggle listeners
   el.querySelectorAll('.collapsible-header').forEach(header => {
