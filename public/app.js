@@ -57,7 +57,6 @@ function bindNav() {
       const view = el.dataset.view;
       document.getElementById('view-' + view).classList.remove('hidden');
       document.getElementById('topbar-title').textContent = el.textContent.trim().replace(/\d+/, '').trim();
-      if (view === 'today') renderToday();
       if (view === 'all') renderAll();
       if (view === 'completed') renderCompleted();
       if (view === 'calendar') showCalendarView();
@@ -82,7 +81,7 @@ async function loadTasks() {
   const res = await fetch('/api/tasks');
   tasks = await res.json();
   updateBadge();
-  renderToday();
+  renderScheduled();
 }
 
 async function createTask(data) {
@@ -90,14 +89,14 @@ async function createTask(data) {
   const task = await res.json();
   tasks.unshift(task);
   updateBadge();
-  renderToday();
+  renderScheduled();
 }
 
 async function completeTask(id) {
   await fetch('/api/tasks/' + id + '/complete', { method: 'PATCH' });
   tasks = tasks.filter(t => t.id !== id);
   updateBadge();
-  renderToday();
+  renderScheduled();
   renderAll();
 }
 
@@ -105,7 +104,7 @@ async function deleteTask(id) {
   await fetch('/api/tasks/' + id, { method: 'DELETE' });
   tasks = tasks.filter(t => t.id !== id);
   updateBadge();
-  renderToday();
+  renderScheduled();
   renderAll();
 }
 
@@ -232,16 +231,28 @@ function getWeekBounds(offsetWeeks = 0) {
   return { start: mon, end: sun };
 }
 
-function makeSection(label, tasks, collapsed = false) {
-  if (!tasks.length) return '';
+// Collapse state survives re-renders (task added/completed, pull-to-refresh)
+// within the session — without this, finishing a task would silently
+// re-collapse every section you'd opened. Keyed by the section's id, only
+// written once the user actually clicks a header; absent means "use this
+// render's own default".
+const sectionOverride = {};
+
+// emptyMessage: shown instead of disappearing when the section has nothing
+// in it. Today needs this — "nothing due" is useful to see; the others still
+// vanish when empty, which is the right call for e.g. Overdue.
+function makeSection(label, taskList, collapsed = false, emptyMessage = null) {
+  if (!taskList.length && !emptyMessage) return '';
   const id = 'section-' + label.toLowerCase().replace(/[^a-z]/g, '');
-  const chevronIcon = collapsed ? 'right' : 'down';
+  const isCollapsed = id in sectionOverride ? sectionOverride[id] : collapsed;
+  const chevronIcon = isCollapsed ? 'right' : 'down';
+  const count = taskList.length ? ' <span style="color:var(--text3);font-weight:400;">(' + taskList.length + ')</span>' : '';
   let html = '<div class="section-header collapsible-header" data-target="' + id + '">' +
-    '<span class="section-lbl" style="margin:0;">' + label + ' <span style="color:var(--text3);font-weight:400;">(' + tasks.length + ')</span></span>' +
+    '<span class="section-lbl" style="margin:0;">' + label + count + '</span>' +
     '<i class="ti ti-chevron-' + chevronIcon + '" style="font-size:13px;color:var(--text3);" id="chevron-' + id + '"></i>' +
     '</div>';
-  html += '<div id="' + id + '"' + (collapsed ? ' class="hidden"' : '') + '>';
-  html += tasks.map(taskHTML).join('');
+  html += '<div id="' + id + '"' + (isCollapsed ? ' class="hidden"' : '') + '>';
+  html += taskList.length ? taskList.map(taskHTML).join('') : '<div class="empty" style="padding:0.5rem 0 1rem;text-align:left;">' + emptyMessage + '</div>';
   html += '</div>';
   return html;
 }
@@ -251,53 +262,8 @@ function toggleSection(id) {
   const chevron = document.getElementById('chevron-' + id);
   if (!el) return;
   el.classList.toggle('hidden');
-  if (chevron) chevron.className = 'ti ti-chevron-' + (el.classList.contains('hidden') ? 'right' : 'down');
-}
-
-function renderToday() {
-  renderTimelineFeed();
-  const el = document.getElementById('today-tasks');
-  const sorted = sortTasks([...tasks]);
-  const thisWeekBounds = getWeekBounds(0);
-  const nextWeekBounds = getWeekBounds(1);
-
-  const overdue = sorted.filter(t => isOverdue(t.due_date));
-  const dueToday = sorted.filter(t => isDueToday(t.due_date));
-  const p1NoDue = sorted.filter(t => !t.due_date && t.priority === 'p1');
-  const thisWeek = sorted.filter(t => {
-    if (!t.due_date || isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
-    const d = new Date(t.due_date.split('T')[0] + 'T00:00:00');
-    return d >= thisWeekBounds.start && d <= thisWeekBounds.end;
-  });
-  const nextWeek = sorted.filter(t => {
-    if (!t.due_date || isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
-    const d = new Date(t.due_date.split('T')[0] + 'T00:00:00');
-    return d >= nextWeekBounds.start && d <= nextWeekBounds.end;
-  });
-  const upNext = sorted.filter(t => {
-    if (!t.due_date || isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
-    const d = new Date(t.due_date.split('T')[0] + 'T00:00:00');
-    return d > nextWeekBounds.end;
-  });
-  const undated = sorted.filter(t => !t.due_date && t.priority !== 'p1');
-
-  let html = '';
-  if (overdue.length) html += makeSection('Overdue', overdue, false);
-  // Unlike the other sections, Today never disappears when it's empty — it's
-  // the one thing this tab exists to answer, and a silent gap where it
-  // should be reads as broken rather than as "nothing's due".
-  html += '<div class="section-lbl">Today</div>';
-  html += dueToday.length ? dueToday.map(taskHTML).join('') : '<div class="empty" style="padding:0.5rem 0 1rem;text-align:left;">Nothing due today.</div>';
-  if (p1NoDue.length) html += makeSection('High priority', p1NoDue, false);
-  if (thisWeek.length) html += makeSection('This week', thisWeek, false);
-  if (nextWeek.length) html += makeSection('Next week', nextWeek, true);
-  if (upNext.length) html += makeSection('Up next', upNext, true);
-  if (undated.length) html += makeSection('No date', undated, true);
-  el.innerHTML = html;
-  // Attach section toggle listeners
-  el.querySelectorAll('.collapsible-header').forEach(header => {
-    header.addEventListener('click', () => toggleSection(header.dataset.target));
-  });
+  sectionOverride[id] = el.classList.contains('hidden');
+  if (chevron) chevron.className = 'ti ti-chevron-' + (sectionOverride[id] ? 'right' : 'down');
 }
 
 function renderAll() {
@@ -346,7 +312,7 @@ async function uncompleteTask(id) {
   tasks = await res.json();
   updateBadge();
   renderCompleted();
-  renderToday();
+  renderScheduled();
 }
 
 async function editCompletedTask(id) {
@@ -455,7 +421,7 @@ function bindModal() {
 
   // Single-key shortcuts, as long as you're not typing somewhere else or the
   // modal is already open: n = new task, t/w/s/c/m = jump to a nav tab.
-  const NAV_SHORTCUTS = { i: 'inbox', t: 'today', l: 'timeline', s: 'scheduled', c: 'calendar', m: 'marketing' };
+  const NAV_SHORTCUTS = { i: 'inbox', l: 'timeline', s: 'scheduled', c: 'calendar', m: 'marketing' };
   document.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (!document.getElementById('modal-bg').classList.contains('hidden')) return;
@@ -537,7 +503,7 @@ async function saveModal() {
     document.getElementById('modal-bg')._wasCompleted = undefined;
     const doneEl = document.getElementById('m-done'); if (doneEl) doneEl.checked = false;
     closeModal();
-    renderToday(); renderAll();
+    renderScheduled(); renderAll();
     return;
   }
   if (editId && wasCompleted && !markDone) {
@@ -548,7 +514,7 @@ async function saveModal() {
     document.getElementById('modal-bg')._editId = undefined;
     document.getElementById('modal-bg')._wasCompleted = undefined;
     closeModal();
-    renderToday(); renderAll(); renderCompleted();
+    renderScheduled(); renderAll(); renderCompleted();
     return;
   }
   if (editId) {
@@ -582,7 +548,7 @@ async function saveModal() {
       document.getElementById('modal-bg')._proposalIndex = undefined;
     }
   }
-  renderToday();
+  renderScheduled();
   renderAll();
   closeModal();
 }
@@ -696,33 +662,51 @@ function formatDayLabel(d) {
   return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
 }
 
+// Scheduled is the main "what's on" view: Overdue and Today are always
+// visible (Today even when it's empty - "nothing due" is still worth
+// seeing), everything further out is grouped by how soon it matters and
+// collapsed by default so the page opens short. This used to be Today's job;
+// Today as a separate tab is gone, folded in here.
 function renderScheduled() {
+  renderTimelineFeed();
   const el = document.getElementById('scheduled-tasks');
   if (!el) return;
-  const dated = tasks.filter(t => t.due_date).sort((a,b) => a.due_date.localeCompare(b.due_date));
-  const undated = tasks.filter(t => !t.due_date);
-  if (!dated.length && !undated.length) { el.innerHTML = '<div class="empty">No tasks scheduled.</div>'; return; }
-  
-  // Group by date
-  const groups = {};
-  dated.forEach(t => {
-    const d = t.due_date.split('T')[0];
-    if (!groups[d]) groups[d] = [];
-    groups[d].push(t);
+  const sorted = sortTasks([...tasks]);
+  const thisWeekBounds = getWeekBounds(0);
+  const nextWeekBounds = getWeekBounds(1);
+
+  const overdue = sorted.filter(t => isOverdue(t.due_date));
+  const dueToday = sorted.filter(t => isDueToday(t.due_date));
+  const p1NoDue = sorted.filter(t => !t.due_date && t.priority === 'p1');
+  const thisWeek = sorted.filter(t => {
+    if (!t.due_date || isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
+    const d = new Date(t.due_date.split('T')[0] + 'T00:00:00');
+    return d >= thisWeekBounds.start && d <= thisWeekBounds.end;
   });
+  const nextWeek = sorted.filter(t => {
+    if (!t.due_date || isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
+    const d = new Date(t.due_date.split('T')[0] + 'T00:00:00');
+    return d >= nextWeekBounds.start && d <= nextWeekBounds.end;
+  });
+  const upNext = sorted.filter(t => {
+    if (!t.due_date || isOverdue(t.due_date) || isDueToday(t.due_date)) return false;
+    const d = new Date(t.due_date.split('T')[0] + 'T00:00:00');
+    return d > nextWeekBounds.end;
+  });
+  const undated = sorted.filter(t => !t.due_date && t.priority !== 'p1');
 
   let html = '';
-  Object.keys(groups).sort().forEach(date => {
-    const d = new Date(date + 'T00:00:00');
-    const od = date < today;
-    html += '<div class="sched-day-label' + (od ? ' overdue' : '') + '">' + formatDayLabel(d) + '</div>';
-    html += groups[date].map(taskHTML).join('');
+  html += makeSection('Overdue', overdue, false);
+  html += makeSection('Today', dueToday, false, 'Nothing due today.');
+  html += makeSection('High priority', p1NoDue, false);
+  html += makeSection('This week', thisWeek, false);
+  html += makeSection('Next week', nextWeek, true);
+  html += makeSection('Up next', upNext, true);
+  html += makeSection('No date', undated, true);
+  el.innerHTML = html || '<div class="empty">Nothing on your plate. Add a task or enjoy the quiet.</div>';
+  el.querySelectorAll('.collapsible-header').forEach(header => {
+    header.addEventListener('click', () => toggleSection(header.dataset.target));
   });
-  if (undated.length) {
-    html += '<div class="sched-day-label" style="margin-top:1.5rem;">No date</div>';
-    html += undated.map(taskHTML).join('');
-  }
-  el.innerHTML = html || '<div class="empty">Nothing scheduled.</div>';
 }
 
 
@@ -932,7 +916,6 @@ function mobileNav(view, tabEl) {
   document.getElementById('view-' + view).classList.remove('hidden');
   document.getElementById('topbar-title').textContent = 
     view === 'inbox' ? 'Inbox' :
-    view === 'today' ? 'Today' :
     view === 'all' ? 'Tasks' :
     view === 'scheduled' ? 'Scheduled' :
     view === 'completed' ? 'Completed' :
@@ -944,7 +927,6 @@ function mobileNav(view, tabEl) {
   document.querySelectorAll('.ni[data-view]').forEach(n => {
     n.classList.toggle('active', n.dataset.view === view);
   });
-  if (view === 'today') renderToday();
   if (view === 'all') renderAll();
   if (view === 'completed') renderCompleted();
   if (view === 'calendar') showCalendarView();
@@ -986,7 +968,6 @@ function syncMobileBadges() {
 // the only thing on offer. Cmd/Ctrl+Enter always adds.
 const CMDK_VIEWS = [
   { view: 'inbox', label: 'Inbox', icon: 'ti-inbox' },
-  { view: 'today', label: 'Today', icon: 'ti-layout-dashboard' },
   { view: 'timeline', label: 'Timeline', icon: 'ti-timeline' },
   { view: 'scheduled', label: 'Scheduled', icon: 'ti-list-details' },
   { view: 'calendar', label: 'Calendar', icon: 'ti-calendar' },

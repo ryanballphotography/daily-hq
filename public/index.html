@@ -22,9 +22,8 @@
       <div class="ni active" data-view="inbox"><i class="ti ti-inbox"></i> Inbox <span class="nb" id="inbox-badge" style="display:none"></span></div>
 
       <div class="ns">Plan</div>
-      <div class="ni" data-view="today"><i class="ti ti-layout-dashboard"></i> Today</div>
-      <div class="ni" data-view="timeline"><i class="ti ti-timeline"></i> Timeline</div>
       <div class="ni" data-view="scheduled"><i class="ti ti-list-details"></i> Scheduled</div>
+      <div class="ni" data-view="timeline"><i class="ti ti-timeline"></i> Timeline</div>
       <div class="ni" data-view="calendar"><i class="ti ti-calendar"></i> Calendar</div>
       <div class="ni" data-view="marketing"><i class="ti ti-speakerphone"></i> Marketing</div>
 
@@ -74,15 +73,11 @@
         <div id="timeline-feed-body"></div>
       </div>
 
-      <!-- Today view -->
-      <div class="view hidden" id="view-today">
-        <div id="today-tasks"></div>
-        <div id="sp-panel"></div>
-      </div>
-
-      <!-- Scheduled view -->
+      <!-- Scheduled view — the main "what's on" view: Overdue/Today always
+           shown, everything further out grouped and collapsible. -->
       <div class="view hidden" id="view-scheduled">
         <div id="scheduled-tasks"></div>
+        <div id="sp-panel"></div>
       </div>
 
       <!-- Calendar view -->
@@ -289,9 +284,9 @@
       <span>Inbox</span>
       <span class="mobile-tab-badge" id="mob-inbox-badge" style="display:none"></span>
     </button>
-    <button class="mobile-tab" onclick="mobileNav('today',this)">
-      <i class="ti ti-layout-dashboard"></i>
-      <span>Today</span>
+    <button class="mobile-tab" onclick="mobileNav('scheduled',this)">
+      <i class="ti ti-list-details"></i>
+      <span>Scheduled</span>
     </button>
     <button class="mobile-tab" onclick="mobileNav('timeline',this)">
       <i class="ti ti-timeline"></i>
