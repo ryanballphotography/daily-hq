@@ -883,8 +883,13 @@ async function checkReminders() {
   } catch(e) { console.error('Reminder check error:', e.message); }
 }
 
-// Run every 15 minutes
-setInterval(checkReminders, 15 * 60 * 1000);
+// Every minute, not every 15: the overdue lookback below is only 10 minutes,
+// which a 15-minute interval doesn't reliably land inside — a task due soon
+// after it's created could fall through both windows and never get a
+// reminder at all. A 1-minute poll makes that gap effectively impossible
+// while the SELECT itself stays cheap (a couple of indexed-ish queries over
+// a small table).
+setInterval(checkReminders, 60 * 1000);
 
 initDB().then(() => {
   app.listen(PORT, () => console.log(`Daily HQ running on ${PORT}`));
