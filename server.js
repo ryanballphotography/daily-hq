@@ -796,9 +796,18 @@ app.patch("/api/marketing-content/:id", async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 // ── Pushover reminder cron ─────────────────────────
+// Priority 2 ("emergency") is the only Pushover priority that actually uses
+// retry/expire — anything lower sends once and those two fields are ignored,
+// which is what this was doing before despite looking configured for repeat
+// alerts. Emergency repeats the push every `retry` seconds until it's
+// acknowledged (tapping it on ANY device — phone or the Mac app — silences
+// it everywhere) or `expire` seconds pass. expire is kept well under the
+// reminder loop's own resend gate (35 min for due-soon, 15 min overdue, see
+// checkReminders) so a native retry chain always finishes before the next
+// cron tick could start a second one on top of it.
 async function sendPushover(message, title) {
   try {
-    await fetch('https://api.pushover.net/1/messages.json', {
+    const res = await fetch('https://api.pushover.net/1/messages.json', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -806,12 +815,14 @@ async function sendPushover(message, title) {
         user: process.env.PUSHOVER_USER,
         title: title || 'Daily HQ',
         message,
-        priority: 1,
+        priority: 2,
         retry: 60,
-        expire: 3600,
+        expire: 600,
         sound: 'pushover'
       })
     });
+    const data = await res.json();
+    if (!res.ok || data.status !== 1) console.error('Pushover rejected the message:', res.status, JSON.stringify(data));
   } catch(e) { console.error('Pushover error:', e.message); }
 }
 
