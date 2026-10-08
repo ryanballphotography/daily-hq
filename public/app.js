@@ -167,6 +167,7 @@ async function editTask(id) {
   document.getElementById('m-notes').value = t.notes || '';
   document.getElementById('m-category').value = t.category || 'work';
   document.getElementById('m-recurring').value = t.recurring || '';
+  document.getElementById('m-remind').value = t.reminder_lead == null ? '30' : String(t.reminder_lead);
   resetPickerFields(t.due_date ? t.due_date.split('T')[0] : '', t.time_block || '');
   document.getElementById('modal-bg').classList.remove('hidden');
   document.getElementById('modal-bg')._editId = id;
@@ -481,6 +482,7 @@ function openModal() {
   document.getElementById('m-notes').value = '';
   document.getElementById('m-category').value = 'work';
   document.getElementById('m-recurring').value = '';
+  document.getElementById('m-remind').value = '30';
   document.getElementById('m-preview').textContent = '';
   resetPickerFields();
   document.getElementById("modal-bg").classList.remove('hidden');
@@ -527,7 +529,8 @@ async function saveModal() {
         raw_text: rawText,
         notes: document.getElementById('m-notes').value,
         category: document.getElementById('m-category').value,
-        recurring: document.getElementById('m-recurring').value
+        recurring: document.getElementById('m-recurring').value,
+        reminder_lead: Number(document.getElementById('m-remind').value)
       })
     });
     const updated = await res.json();
@@ -539,7 +542,8 @@ async function saveModal() {
       raw_text: rawText,
       notes: document.getElementById('m-notes').value,
       category: document.getElementById('m-category').value,
-      recurring: document.getElementById('m-recurring').value
+      recurring: document.getElementById('m-recurring').value,
+      reminder_lead: Number(document.getElementById('m-remind').value)
     });
     const idx = document.getElementById('modal-bg')._proposalIndex;
     if (idx !== undefined) {

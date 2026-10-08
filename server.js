@@ -13,6 +13,7 @@ const cookieParser = require('cookie-parser');
 const { parseTask } = require('./lib/parseTask');
 const { londonParts, minutesToHHMM } = require('./lib/londonTime');
 const { nextOccurrence } = require('./lib/recurrence');
+const { dueSoonTasks, clampLead } = require('./lib/reminderWindow');
 
 // pg parses DATE columns into a JS Date at LOCAL midnight, and res.json()
 // then serialises Dates via toISOString() (UTC). During BST (UTC+1) that
@@ -306,6 +307,10 @@ async function initDB() {
   await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time_block VARCHAR(20) DEFAULT NULL`);
   await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reminder_sent_at TIMESTAMPTZ DEFAULT NULL`);
   await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0`);
+  // Minutes before time_block to send the advance Pushover alert; 0 means
+  // "only at the time", null (pre-migration rows, or any insert that omits
+  // it) is treated as 30 to match the old hardcoded behaviour.
+  await pool.query(`ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reminder_lead INTEGER DEFAULT 30`);
   // Natural-language task capture (lib/parseTask.js): contact + the original
   // sentence. Date/time reuse the existing due_date/time_block columns so the
   // Pushover/Gmail reminder system keeps working unmodified.
@@ -429,7 +434,7 @@ function toTimeStr(d, hasTime) {
   return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
-async function insertParsedTask(sentence, { notes, category, recurring, source } = {}) {
+async function insertParsedTask(sentence, { notes, category, recurring, source, reminder_lead } = {}) {
   const raw = (sentence || '').toString();
   let parsed;
   try {
@@ -440,16 +445,16 @@ async function insertParsedTask(sentence, { notes, category, recurring, source }
   const title = parsed.title || raw || '(untitled)';
   const dbPriority = PRIORITY_TO_DB[parsed.priority] || 'p3';
   return pool.query(
-    `INSERT INTO tasks (title, notes, due_date, time_block, priority, category, tag, contact, recurring, raw_text, source)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-    [title, notes || null, toDateStr(parsed.dueAt), toTimeStr(parsed.dueAt, parsed.hasTime), dbPriority, category || 'work', parsed.project, parsed.contact, recurring || null, parsed.raw, source || 'manual']
+    `INSERT INTO tasks (title, notes, due_date, time_block, priority, category, tag, contact, recurring, raw_text, source, reminder_lead)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    [title, notes || null, toDateStr(parsed.dueAt), toTimeStr(parsed.dueAt, parsed.hasTime), dbPriority, category || 'work', parsed.project, parsed.contact, recurring || null, parsed.raw, source || 'manual', clampLead(reminder_lead)]
   );
 }
 
 app.post('/api/tasks', async (req, res) => {
-  const { raw_text, notes, category, recurring } = req.body;
+  const { raw_text, notes, category, recurring, reminder_lead } = req.body;
   try {
-    const result = await insertParsedTask(raw_text, { notes, category, recurring, source: 'manual' });
+    const result = await insertParsedTask(raw_text, { notes, category, recurring, source: 'manual', reminder_lead });
     res.json(result.rows[0]);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -472,11 +477,12 @@ app.post('/api/inbox', async (req, res) => {
 // Columns editable via PATCH — also guards against req.body keys being used
 // unsanitised as SQL column names (matches the allow-list pattern already
 // used by PATCH /api/marketing-contacts/:id below).
-const TASK_PATCH_ALLOWED = ['title', 'notes', 'due_date', 'time_block', 'priority', 'category', 'tag', 'contact', 'recurring', 'raw_text', 'done', 'completed_at', 'snoozed_until', 'sort_order', 'reminder_sent_at'];
+const TASK_PATCH_ALLOWED = ['title', 'notes', 'due_date', 'time_block', 'priority', 'category', 'tag', 'contact', 'recurring', 'raw_text', 'done', 'completed_at', 'snoozed_until', 'sort_order', 'reminder_sent_at', 'reminder_lead'];
 
 app.patch('/api/tasks/:id', async (req, res) => {
   const { id } = req.params;
   const fields = { ...req.body };
+  if ('reminder_lead' in fields) fields.reminder_lead = clampLead(fields.reminder_lead);
 
   // Editing the sentence re-derives every parsed field — the sentence is the
   // source of truth, so this overrides any of these keys also sent as-is.
@@ -850,26 +856,28 @@ async function checkReminders() {
     // time_block values are London wall-clock times; compare against London
     // time in both GMT and BST rather than a fixed offset.
     const now = londonParts(new Date());
-    const ahead = londonParts(new Date(Date.now() + 30 * 60 * 1000));
     const todayStr = now.date;
     const nowStr = now.time;
-    // The window can't extend past midnight: due_date is a single day.
-    const in30Str = ahead.date === now.date ? ahead.time : '23:59';
     const tenAgoStr = minutesToHHMM(now.minutes - 10);
-    console.log('Reminder window:', todayStr, nowStr, '->', in30Str);
-    // Due within 30 mins, no reminder sent yet or last reminder > 35 mins ago
-    const res = await pool.query(
-      `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block > $2 AND time_block <= $3
+    console.log('Reminder check at', todayStr, nowStr);
+    // Candidates for the advance ping: not done, due today, has a time, not
+    // recently reminded. Which of these are actually "soon" depends on each
+    // task's own reminder_lead, so that's decided in JS (dueSoonTasks) rather
+    // than with a single fixed window in the SQL.
+    const candidates = await pool.query(
+      `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL
        AND (reminder_sent_at IS NULL OR reminder_sent_at < NOW() - INTERVAL '35 minutes')`,
-      [todayStr, nowStr, in30Str]
+      [todayStr]
     );
-    console.log('Tasks found:', res.rows.length, res.rows.map(t => t.title + ' ' + t.time_block));
-    for (const task of res.rows) {
+    const dueSoon = dueSoonTasks(candidates.rows, now.minutes);
+    console.log('Due soon:', dueSoon.length, dueSoon.map(t => t.title + ' ' + t.time_block + ' (lead ' + (t.reminder_lead ?? 30) + ')'));
+    for (const task of dueSoon) {
       await sendPushover(task.title, '⏰ Due at ' + task.time_block);
       await pool.query('UPDATE tasks SET reminder_sent_at = NOW() WHERE id = $1', [task.id]);
       console.log('Reminder sent for:', task.title);
     }
-    // 10 mins overdue and not done
+    // 10 mins overdue and not done — unaffected by reminder_lead, which only
+    // controls the advance ping; everyone still gets nagged once it's late.
     const overdueRes = await pool.query(
       `SELECT * FROM tasks WHERE done = false AND due_date::date = $1 AND time_block IS NOT NULL AND time_block >= $2 AND time_block < $3
        AND (reminder_sent_at IS NULL OR reminder_sent_at < NOW() - INTERVAL '15 minutes')`,
