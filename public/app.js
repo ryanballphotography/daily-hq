@@ -36,10 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
   loadShootTasksForToday();
   bindNav();
   bindModal();
-  bindQuickAdd();
   bindTimelineDnD();
   bindCmdk();
-  showInboxPrompt();
+  showEmailPrompt();
   loadContacts();
 });
 
@@ -60,7 +59,6 @@ function bindNav() {
       if (view === 'all') renderAll();
       if (view === 'completed') renderCompleted();
       if (view === 'calendar') showCalendarView();
-      if (view === 'inbox') showInboxPrompt();
       if (view === 'timeline') renderTimelineFeed(true);
       if (view === 'scheduled') renderScheduled();
       if (view === 'marketing') {
@@ -369,39 +367,6 @@ function schedulePreview() {
   previewTimer = setTimeout(updatePreview, 200);
 }
 
-// ── Inbox quick-add bar — same parser, same preview format, one keystroke ──
-function updateQuickAddPreview() {
-  const el = document.getElementById('quickadd-preview');
-  const input = document.getElementById('quickadd-input');
-  if (!el || !input) return;
-  const text = input.value;
-  if (!text.trim()) { el.innerHTML = ''; return; }
-  const preview = formatPreview(parseTask(text)).replace(/#(\S+)/, '<span class="qa-tag">#$1</span>');
-  el.innerHTML = '<span class="qa-dot"></span><span>' + preview + '</span>';
-}
-
-let quickAddPreviewTimer = null;
-function scheduleQuickAddPreview() {
-  clearTimeout(quickAddPreviewTimer);
-  quickAddPreviewTimer = setTimeout(updateQuickAddPreview, 200);
-}
-
-async function submitQuickAdd() {
-  const input = document.getElementById('quickadd-input');
-  const rawText = input.value.trim();
-  if (!rawText) return;
-  await createTask({ raw_text: rawText, category: 'work', recurring: '' });
-  input.value = '';
-  document.getElementById('quickadd-preview').innerHTML = '';
-}
-
-function bindQuickAdd() {
-  const input = document.getElementById('quickadd-input');
-  if (!input) return;
-  input.addEventListener('input', scheduleQuickAddPreview);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') submitQuickAdd(); });
-}
-
 function bindModal() {
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   (() => {
@@ -421,8 +386,8 @@ function bindModal() {
   document.getElementById('m-pick-time').addEventListener('change', applyPickedDate);
 
   // Single-key shortcuts, as long as you're not typing somewhere else or the
-  // modal is already open: n = new task, t/w/s/c/m = jump to a nav tab.
-  const NAV_SHORTCUTS = { i: 'inbox', l: 'timeline', s: 'scheduled', c: 'calendar', m: 'marketing' };
+  // modal is already open: n = new task, l/s/c/m = jump to a nav tab.
+  const NAV_SHORTCUTS = { l: 'timeline', s: 'scheduled', c: 'calendar', m: 'marketing' };
   document.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (!document.getElementById('modal-bg').classList.contains('hidden')) return;
@@ -431,9 +396,7 @@ function bindModal() {
     const key = e.key.toLowerCase();
     if (key === 'n') {
       e.preventDefault();
-      const quickAdd = document.getElementById('quickadd-input');
-      const onInbox = quickAdd && !document.getElementById('view-inbox').classList.contains('hidden');
-      if (onInbox) quickAdd.focus(); else openModal();
+      openModal();
       return;
     }
     if (NAV_SHORTCUTS[key]) {
@@ -550,6 +513,7 @@ async function saveModal() {
       const el = document.getElementById('proposal-' + idx);
       if (el) el.remove();
       document.getElementById('modal-bg')._proposalIndex = undefined;
+      afterProposalRemoved();
     }
   }
   renderScheduled();
@@ -571,28 +535,28 @@ async function loadCalendarEvents() {
 
 
 
-function showInboxPrompt() {
-  const el = document.getElementById('inbox-proposals');
+// ── Email → task proposals, shown at the top of Scheduled ──
+function showEmailPrompt() {
+  const el = document.getElementById('email-proposals');
   if (!el) return;
-  if (el._loaded) return;
-  el.innerHTML = '<div class="inbox-check-card"><div class="inbox-check-icon"><i class="ti ti-mail"></i></div><div><div style="font-size:12.5px;font-weight:600;">Check your inbox</div><button class="inbox-check-link" onclick="loadInbox()">Check emails →</button></div></div>';
+  el.innerHTML = '<div class="inbox-check-card"><div class="inbox-check-icon"><i class="ti ti-mail"></i></div><div><div style="font-size:12.5px;font-weight:600;">Check your inbox</div><button class="inbox-check-link" onclick="loadEmailProposals()">Check emails →</button></div></div>';
 }
 
-async function loadInbox(reset = false) {
-  const el = document.getElementById('inbox-proposals');
-  const badge = document.getElementById('inbox-badge');
+async function loadEmailProposals(reset = false) {
+  const el = document.getElementById('email-proposals');
   if (!el) return;
   el.innerHTML = '<div class="empty">Checking emails...</div>';
   try {
     const res = await fetch('/api/gmail-summary' + (reset ? '?reset=1' : ''));
     const data = await res.json();
     if (!data.proposals || !data.proposals.length) {
-      el.innerHTML = '<div class="empty">No emails needing action. All caught up.</div>';
-      if (badge) { badge.style.display = 'none'; }
+      el._proposals = null;
+      setEmailBadge(0);
+      el.innerHTML = '<div class="inbox-check-card"><div class="inbox-check-icon"><i class="ti ti-mail-check"></i></div><div><div style="font-size:12.5px;font-weight:600;">No emails needing action. All caught up.</div><button class="inbox-check-link" onclick="loadEmailProposals(true)">Check again →</button></div></div>';
       return;
     }
-    if (badge) { badge.textContent = data.proposals.length; badge.style.display = 'inline'; }
-    let html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;"><div style="font-size:13px;font-weight:500;">' + data.proposals.length + ' email' + (data.proposals.length !== 1 ? 's' : '') + ' needing action</div><button onclick="loadInbox(true)" style="font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:6px;background:transparent;cursor:pointer;">Refresh</button></div>';
+    setEmailBadge(data.proposals.length);
+    let html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;"><div style="font-size:13px;font-weight:500;">' + data.proposals.length + ' email' + (data.proposals.length !== 1 ? 's' : '') + ' needing action</div><div style="display:flex;gap:6px;"><button onclick="loadEmailProposals(true)" style="font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:6px;background:transparent;color:var(--text2);cursor:pointer;">Refresh</button><button onclick="hideEmailProposals()" style="font-size:11px;padding:3px 10px;border:0.5px solid var(--border2);border-radius:6px;background:transparent;color:var(--text2);cursor:pointer;">Hide</button></div></div>';
     data.proposals.forEach((p, i) => {
       html += `<div class="inbox-card" id="proposal-${i}">
         <div class="inbox-card-header">
@@ -614,8 +578,27 @@ async function loadInbox(reset = false) {
   }
 }
 
+function hideEmailProposals() {
+  setEmailBadge(0);
+  showEmailPrompt();
+}
+
+function setEmailBadge(count) {
+  const badge = document.getElementById('email-badge');
+  if (badge) { badge.textContent = count; badge.style.display = count ? 'inline' : 'none'; }
+  syncMobileBadges();
+}
+
+// Called after a proposal card is accepted or skipped: keep the badge honest,
+// and once the last one's gone, collapse back to the small "Check emails" card
+// so Scheduled isn't left with an empty "N emails needing action" header.
+function afterProposalRemoved() {
+  const remaining = document.querySelectorAll('[id^="proposal-"]').length;
+  if (remaining) setEmailBadge(remaining); else hideEmailProposals();
+}
+
 function acceptProposal(i) {
-  const el = document.getElementById('inbox-proposals');
+  const el = document.getElementById('email-proposals');
   const p = el._proposals[i];
   if (!p) return;
   // Open modal pre-filled with proposal data. Priority carries over as bangs
@@ -634,7 +617,7 @@ function acceptProposal(i) {
 }
 
 async function skipProposal(i) {
-  const el = document.getElementById('inbox-proposals');
+  const el = document.getElementById('email-proposals');
   const p = el && el._proposals ? el._proposals[i] : null;
   if (p && p.threadId) {
     try {
@@ -647,9 +630,7 @@ async function skipProposal(i) {
   }
   const card = document.getElementById('proposal-' + i);
   if (card) card.remove();
-  const remaining = document.querySelectorAll('[id^="proposal-"]').length;
-  const badge = document.getElementById('inbox-badge');
-  if (badge) { badge.textContent = remaining; if (!remaining) badge.style.display = 'none'; }
+  afterProposalRemoved();
 }
 
 
@@ -919,7 +900,6 @@ function mobileNav(view, tabEl) {
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
   document.getElementById('view-' + view).classList.remove('hidden');
   document.getElementById('topbar-title').textContent = 
-    view === 'inbox' ? 'Inbox' :
     view === 'all' ? 'Tasks' :
     view === 'scheduled' ? 'Scheduled' :
     view === 'completed' ? 'Completed' :
@@ -934,7 +914,6 @@ function mobileNav(view, tabEl) {
   if (view === 'all') renderAll();
   if (view === 'completed') renderCompleted();
   if (view === 'calendar') showCalendarView();
-  if (view === 'inbox') showInboxPrompt();
   if (view === 'timeline') renderTimelineFeed(true);
   if (view === 'scheduled') renderScheduled();
 }
@@ -954,13 +933,13 @@ document.addEventListener('click', e => {
 
 function syncMobileBadges() {
   const taskBadge = document.getElementById('mob-task-badge');
-  const inboxBadge = document.getElementById('mob-inbox-badge');
+  const emailBadge = document.getElementById('mob-email-badge');
   const count = tasks.length;
   if (taskBadge) { taskBadge.textContent = count; taskBadge.style.display = count ? 'block' : 'none'; }
-  const inboxCount = document.getElementById('inbox-badge');
-  if (inboxBadge && inboxCount) { 
-    inboxBadge.textContent = inboxCount.textContent; 
-    inboxBadge.style.display = inboxCount.style.display; 
+  const emailCount = document.getElementById('email-badge');
+  if (emailBadge && emailCount) {
+    emailBadge.textContent = emailCount.textContent;
+    emailBadge.style.display = emailCount.style.display === 'none' ? 'none' : 'block';
   }
 }
 
@@ -971,7 +950,6 @@ function syncMobileBadges() {
 // create a task by accident — unless nothing matches, in which case adding is
 // the only thing on offer. Cmd/Ctrl+Enter always adds.
 const CMDK_VIEWS = [
-  { view: 'inbox', label: 'Inbox', icon: 'ti-inbox' },
   { view: 'timeline', label: 'Timeline', icon: 'ti-timeline' },
   { view: 'scheduled', label: 'Scheduled', icon: 'ti-list-details' },
   { view: 'calendar', label: 'Calendar', icon: 'ti-calendar' },
@@ -1082,17 +1060,16 @@ function bindCmdk() {
 // .view scrolls internally instead. window.scrollY is therefore always 0, so
 // checking that for "am I at the top" used to arm this on every downward
 // swipe, anywhere, even mid-scroll through a list — and firing a full
-// location.reload() then dumped you back on the default Inbox tab regardless
+// location.reload() then dumped you back on the default tab regardless
 // of what you were looking at. Check the actual scroll host, and refresh data
 // in place instead of reloading the page.
 async function refreshCurrentView() {
   await loadTasks();
   const visible = document.querySelector('.view:not(.hidden)');
-  const view = visible ? visible.id.replace('view-', '') : 'inbox';
+  const view = visible ? visible.id.replace('view-', '') : 'scheduled';
   if (view === 'all') renderAll();
   if (view === 'completed') renderCompleted();
   if (view === 'calendar') showCalendarView();
-  if (view === 'inbox') showInboxPrompt();
   if (view === 'timeline') renderTimelineFeed(true);
   if (view === 'scheduled') renderScheduled();
   if (view === 'marketing') {

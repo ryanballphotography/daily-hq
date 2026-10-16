@@ -19,10 +19,8 @@
         <span>Ryan Ball Photography</span>
       </div>
 
-      <div class="ni active" data-view="inbox"><i class="ti ti-inbox"></i> Inbox <span class="nb" id="inbox-badge" style="display:none"></span></div>
-
       <div class="ns">Plan</div>
-      <div class="ni" data-view="scheduled"><i class="ti ti-list-details"></i> Scheduled</div>
+      <div class="ni active" data-view="scheduled"><i class="ti ti-list-details"></i> Scheduled <span class="nb" id="email-badge" style="display:none"></span></div>
       <div class="ni" data-view="timeline"><i class="ti ti-timeline"></i> Timeline</div>
       <div class="ni" data-view="calendar"><i class="ti ti-calendar"></i> Calendar</div>
       <div class="ni" data-view="marketing"><i class="ti ti-speakerphone"></i> Marketing</div>
@@ -45,26 +43,11 @@
 
     <div class="main">
       <div class="topbar">
-        <span class="topbar-title" id="topbar-title">Inbox</span>
+        <span class="topbar-title" id="topbar-title">Scheduled</span>
         <span class="topbar-date" id="topbar-date"></span>
         <button class="dark-toggle" id="cmdk-open" onclick="openCmdk()" title="Search and jump (Cmd/Ctrl+K)"><i class="ti ti-search"></i></button>
         <button class="dark-toggle" id="dark-toggle" onclick="toggleDark()" title="Toggle dark mode"><i class="ti ti-moon"></i></button>
         <button class="btn-add" id="btn-add-task"><i class="ti ti-plus"></i> Add task</button>
-      </div>
-
-      <!-- Inbox view — capture only. Anything that isn't "add a task" or
-           "turn an email into a task" lives in Timeline/Today/Scheduled now. -->
-      <div class="view" id="view-inbox">
-        <div class="quickadd-wrap">
-          <div class="quickadd-bar">
-            <i class="ti ti-plus"></i>
-            <input type="text" id="quickadd-input" placeholder="e.g. Invoice Lidl IE #admin Friday 3pm !!" autocomplete="off" />
-            <span class="quickadd-kbd">N</span>
-          </div>
-          <div class="quickadd-preview" id="quickadd-preview"></div>
-        </div>
-
-        <div id="inbox-proposals" style="margin-top:1.5rem;"></div>
       </div>
 
       <!-- Timeline view — tasks and calendar events merged into one
@@ -73,9 +56,11 @@
         <div id="timeline-feed-body"></div>
       </div>
 
-      <!-- Scheduled view — the main "what's on" view: Overdue/Today always
-           shown, everything further out grouped and collapsible. -->
-      <div class="view hidden" id="view-scheduled">
+      <!-- Scheduled view — the main "what's on" view and the default tab:
+           the email check sits on top, then Overdue/Today always shown and
+           everything further out grouped and collapsible. -->
+      <div class="view" id="view-scheduled">
+        <div id="email-proposals"></div>
         <div id="scheduled-tasks"></div>
         <div id="sp-panel"></div>
       </div>
@@ -292,14 +277,10 @@
 
   <!-- Mobile tab bar -->
   <div class="mobile-tabs" id="mobile-tabs">
-    <button class="mobile-tab active" onclick="mobileNav('inbox',this)">
-      <i class="ti ti-inbox"></i>
-      <span>Inbox</span>
-      <span class="mobile-tab-badge" id="mob-inbox-badge" style="display:none"></span>
-    </button>
-    <button class="mobile-tab" onclick="mobileNav('scheduled',this)">
+    <button class="mobile-tab active" onclick="mobileNav('scheduled',this)">
       <i class="ti ti-list-details"></i>
       <span>Scheduled</span>
+      <span class="mobile-tab-badge" id="mob-email-badge" style="display:none"></span>
     </button>
     <button class="mobile-tab" onclick="mobileNav('timeline',this)">
       <i class="ti ti-timeline"></i>
