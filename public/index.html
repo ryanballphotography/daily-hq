@@ -38,6 +38,9 @@
         <button type="submit" style="width:100%;background:none;border:0.5px solid var(--border2);border-radius:var(--radius);color:var(--text3);font-size:12px;padding:7px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
           <i class="ti ti-logout"></i> Sign out
         </button>
+        <button type="submit" formaction="/logout/all" onclick="return confirm('Sign out of Daily HQ on every device, including this one? Every device will need the 2FA code again.')" style="width:100%;margin-top:6px;background:none;border:none;color:var(--text3);font-size:11px;padding:4px 7px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;">
+          <i class="ti ti-devices-off"></i> Sign out everywhere
+        </button>
       </form>
     </div>
 
@@ -306,6 +309,9 @@
     <div class="mobile-more-item" onclick="window.open('https://shoot-planner.ryanballphotography.com','_blank');toggleMoreSheet()"><i class="ti ti-camera"></i> Shoot Planner</div>
     <div class="mobile-more-item" onclick="window.open('https://the-darkroom-production.up.railway.app','_blank');toggleMoreSheet()"><i class="ti ti-moon"></i> The Darkroom</div>
     <div class="mobile-more-item" onclick="window.open('https://app.freeagent.com','_blank');toggleMoreSheet()"><i class="ti ti-receipt"></i> FreeAgent</div>
+    <form method="POST" action="/logout" id="mobile-logout-form" style="display:none"></form>
+    <div class="mobile-more-item" onclick="document.getElementById('mobile-logout-form').submit()"><i class="ti ti-logout"></i> Sign out</div>
+    <div class="mobile-more-item" onclick="if (confirm('Sign out of Daily HQ on every device, including this one? Every device will need the 2FA code again.')) { const f = document.getElementById('mobile-logout-form'); f.action = '/logout/all'; f.submit(); }"><i class="ti ti-devices-off"></i> Sign out everywhere</div>
   </div>
 
   <script src="vendor/chrono.bundle.js"></script>

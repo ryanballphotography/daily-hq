@@ -14,6 +14,8 @@ const { parseTask } = require('./lib/parseTask');
 const { londonParts, minutesToHHMM } = require('./lib/londonTime');
 const { nextOccurrence } = require('./lib/recurrence');
 const { dueSoonTasks, clampLead } = require('./lib/reminderWindow');
+const sessions = require('./lib/sessions');
+const { createAuth } = require('./lib/auth');
 
 // pg parses DATE columns into a JS Date at LOCAL midnight, and res.json()
 // then serialises Dates via toISOString() (UTC). During BST (UTC+1) that
@@ -36,111 +38,11 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejec
 app.use(express.json());
 app.use(cookieParser());
 
-const crypto = require('crypto');
+// ── Auth: login, 2FA, sliding sessions, sign-out (see lib/auth.js) ──
+const auth = createAuth({ db: pool, sendAlert: sendEmail });
 
-// ── Auth helpers ──────────────────────────────────
-function verifyTotp(secret, code) {
-  const epoch = Math.floor(Date.now() / 30000);
-  function base32decode(s) {
-    const alpha = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-    s = s.toUpperCase().replace(/=+$/, '');
-    let bits = 0, val = 0, out = [];
-    for (const c of s) {
-      val = (val << 5) | alpha.indexOf(c);
-      bits += 5;
-      if (bits >= 8) { out.push((val >> (bits - 8)) & 0xff); bits -= 8; }
-    }
-    return Buffer.from(out);
-  }
-  function hotp(key, counter) {
-    const buf = Buffer.alloc(8);
-    for (let i = 7; i >= 0; i--) { buf[i] = counter & 0xff; counter >>= 8; }
-    const hmac = crypto.createHmac('sha1', base32decode(key));
-    hmac.update(buf);
-    const h = hmac.digest();
-    const o = h[19] & 0xf;
-    return ((h[o] & 0x7f) << 24 | h[o+1] << 16 | h[o+2] << 8 | h[o+3]) % 1000000;
-  }
-  const input = parseInt(code);
-  for (const drift of [0, -1, 1]) {
-    if (hotp(secret, epoch + drift) === input) return true;
-  }
-  return false;
-}
-
-function generateToken() {
-  return crypto.randomBytes(32).toString('hex');
-}
-
-// ── Trusted-device cookie (7-day TOTP skip) ──────
-const TRUSTED_SECRET = process.env.HQ_SESSION_SECRET || process.env.HQ_PASSWORD;
-
-function signTrustedCookie() {
-  const ts = Date.now().toString();
-  const sig = crypto.createHmac('sha256', TRUSTED_SECRET).update(ts).digest('hex');
-  return `${ts}.${sig}`;
-}
-
-function verifyTrustedCookie(value) {
-  if (!value) return false;
-  const parts = value.split('.');
-  if (parts.length !== 2) return false;
-  const [ts, sig] = parts;
-  if (!/^\d+$/.test(ts)) return false;
-  try {
-    const expected = crypto.createHmac('sha256', TRUSTED_SECRET).update(ts).digest('hex');
-    const sigBuf = Buffer.from(sig, 'hex');
-    const expBuf = Buffer.from(expected, 'hex');
-    if (sigBuf.length !== expBuf.length) return false;
-    if (!crypto.timingSafeEqual(sigBuf, expBuf)) return false;
-  } catch(e) { return false; }
-  const age = Date.now() - parseInt(ts);
-  return age >= 0 && age < 7 * 24 * 60 * 60 * 1000;
-}
-
-// ── Rate limiting ────────────────────────────────
-const loginAttempts = {};
-function rateLimit(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress;
-  const now = Date.now();
-  if (!loginAttempts[ip]) loginAttempts[ip] = [];
-  loginAttempts[ip] = loginAttempts[ip].filter(t => now - t < 15 * 60 * 1000);
-  if (loginAttempts[ip].length >= 10) {
-    return res.status(429).send('Too many attempts. Try again in 15 minutes.');
-  }
-  loginAttempts[ip].push(now);
-  next();
-}
-
-// ── Auth middleware ───────────────────────────────
-async function checkAuth(req, res, next) {
-  const open = ['/login', '/login/verify', '/login/2fa', '/api/siri/add-task'];
-  if (open.includes(req.path)) return next();
-
-  const token = req.cookies['hq_token'];
-  if (!token) {
-    // API calls get 401, page requests get redirect
-    if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorised' });
-    return res.redirect('/login');
-  }
-  try {
-    const result = await pool.query(
-      "SELECT * FROM hq_sessions WHERE token = $1 AND expires_at > NOW() AND verified = true",
-      [token]
-    );
-    if (!result.rows.length) {
-      if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorised' });
-      return res.redirect('/login');
-    }
-    next();
-  } catch(e) {
-    console.log('Auth error:', e.message);
-    if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorised' });
-    res.redirect('/login');
-  }
-}
-
-app.use(checkAuth);
+app.use(auth.checkAuth);
+app.use(auth.router);
 app.use(express.static(path.join(__dirname, 'public')));
 // Served as-is so the browser runs the exact same parsing code as the server.
 app.use('/lib', express.static(path.join(__dirname, 'lib')));
@@ -184,33 +86,6 @@ app.get('/login', (req, res) => {
 </html>`);
 });
 
-app.post('/login', rateLimit, express.urlencoded({ extended: false }), async (req, res) => {
-  const { username, password } = req.body;
-  const validUser = process.env.HQ_USERNAME || 'ryan';
-  const validPass = process.env.HQ_PASSWORD;
-  if (!validPass || username !== validUser || password !== validPass) {
-    return res.redirect('/login?error=1');
-  }
-  // Trusted device — skip TOTP
-  if (verifyTrustedCookie(req.cookies['sp_trusted'])) {
-    const sessionToken = generateToken();
-    await pool.query(
-      "INSERT INTO hq_sessions (token, expires_at, verified) VALUES ($1, NOW() + INTERVAL '24 hours', true)",
-      [sessionToken]
-    );
-    res.cookie('hq_token', sessionToken, { httpOnly: true, secure: true, maxAge: 86400000 });
-    return res.redirect('/');
-  }
-  // Password correct — issue temp token for 2FA step
-  const tempToken = generateToken();
-  await pool.query(
-    "INSERT INTO hq_sessions (token, expires_at, verified) VALUES ($1, NOW() + INTERVAL '5 minutes', false)",
-    [tempToken]
-  );
-  res.cookie('hq_temp', tempToken, { httpOnly: true, secure: true, maxAge: 300000 });
-  res.redirect('/login/2fa');
-});
-
 app.get('/login/2fa', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html>
@@ -249,39 +124,6 @@ app.get('/login/2fa', (req, res) => {
   </div>
 </body>
 </html>`);
-});
-
-app.post('/login/verify', rateLimit, express.urlencoded({ extended: false }), async (req, res) => {
-  const tempToken = req.cookies['hq_temp'];
-  if (!tempToken) return res.redirect('/login');
-
-  const { code } = req.body;
-  const secret = process.env.HQ_TOTP_SECRET;
-  if (!secret || !verifyTotp(secret, code)) {
-    return res.redirect('/login/2fa?error=1');
-  }
-
-  // 2FA passed — create real 24h session
-  const sessionToken = generateToken();
-  await pool.query(
-    "INSERT INTO hq_sessions (token, expires_at, verified) VALUES ($1, NOW() + INTERVAL '24 hours', true)",
-    [sessionToken]
-  );
-  // Clean up temp token
-  await pool.query("DELETE FROM hq_sessions WHERE token = $1", [tempToken]);
-
-  res.clearCookie('hq_temp');
-  res.cookie('hq_token', sessionToken, { httpOnly: true, secure: true, maxAge: 86400000 });
-  res.cookie('sp_trusted', signTrustedCookie(), { httpOnly: true, secure: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
-  res.redirect('/');
-});
-
-app.post('/logout', async (req, res) => {
-  const token = req.cookies['hq_token'];
-  if (token) await pool.query("DELETE FROM hq_sessions WHERE token = $1", [token]);
-  res.clearCookie('hq_token');
-  res.clearCookie('sp_trusted');
-  res.redirect('/login');
 });
 
 async function initDB() {
@@ -355,15 +197,11 @@ async function initDB() {
   )`);
   await pool.query(`ALTER TABLE marketing_contacts ADD COLUMN IF NOT EXISTS last_touch_type VARCHAR(20)`);
   await pool.query(`ALTER TABLE marketing_contacts ADD COLUMN IF NOT EXISTS job_title TEXT`);
-  await pool.query(`CREATE TABLE IF NOT EXISTS hq_sessions (
-    id SERIAL PRIMARY KEY,
-    token VARCHAR(64) NOT NULL UNIQUE,
-    expires_at TIMESTAMP NOT NULL,
-    verified BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT NOW()
-  )`);
-  // Clean expired sessions
-  await pool.query("DELETE FROM hq_sessions WHERE expires_at < NOW()");
+  // Login tokens moved to hq_auth_tokens (hashed, sliding expiry). The old
+  // table only held plaintext 24h tokens that nothing reads any more.
+  await pool.query('DROP TABLE IF EXISTS hq_sessions');
+  await sessions.ensureSchema(pool);
+  await sessions.purgeExpired(pool, Date.now());
   console.log('DB ready');
 }
 
